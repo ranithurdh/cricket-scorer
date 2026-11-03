@@ -5,7 +5,8 @@ import Settings from '../models/Settings.js';
 const router = Router();
 
 // Images arrive as raw bytes (the browser already shrinks them), so no base64 bloat.
-const FIELDS = { background: { limit: 8 * 1024 * 1024 }, icon: { limit: 1 * 1024 * 1024 } };
+const MB = process.env.VERCEL ? 4 : 8; // Vercel functions accept at most ~4.5 MB per request
+const FIELDS = { background: { limit: MB * 1024 * 1024 }, icon: { limit: 1 * 1024 * 1024 } };
 const TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/x-icon', 'image/vnd.microsoft.icon'];
 
 const version = (img) => (img?.updatedAt ? img.updatedAt.getTime() : null);

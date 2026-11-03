@@ -36,7 +36,7 @@ router.get('/', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/import', express.json({ limit: '60mb' }), async (req, res, next) => {
+router.post('/import', express.json({ limit: process.env.VERCEL ? '4mb' : '60mb' }), async (req, res, next) => {
   try {
     const b = req.body;
     if (!b || b.format !== FORMAT || !Array.isArray(b.matches)) {

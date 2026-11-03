@@ -165,3 +165,12 @@ Set both in `.env` (see `.env.example`). If you don't, the defaults are `admin` 
 - Build and run as one server: `npm run build` then `npm run server`. It serves `dist/` as well as `/api`, so one https address does everything. (Or host `dist/` on Netlify/Vercel and proxy `/api` to the server.)
 - Scoring offline: the match is kept in the browser after every ball, and when the phone comes back online it saves to the database automatically. Stats pages need a connection.
 - After shipping a change, bump `CACHE` in `sw.js` if old files ever stick.
+
+## Deploy on Vercel (free) with MongoDB Atlas
+
+- `api/index.js` and `api/[...path].js` run `server/handler.js`, which wraps the Express app (`server/app.js`) as a Vercel function; `api/[...path].js` (a catch-all) receives every `/api/*` request and Vercel serves the built site. `server/db.js` connects to MongoDB on demand and does the start-up work once per instance. `npm run server` still works for running it yourself (`server/index.js`).
+- Environment variables (Vercel → Project → Settings → Environment Variables): `MONGODB_URI`, `ADMIN_PASSWORD`, `SCORER_PASSWORD`, `AUTH_SECRET`.
+- Atlas → Network Access must allow `0.0.0.0/0` (Vercel's addresses change).
+- Limits: Vercel accepts ~4.5 MB per request and reply. Uploaded backgrounds are capped at 4 MB, Import backup at 4 MB, and Backup download fails if the file would pass 4.5 MB. If that ever happens, export/import from a local copy (`npm run dev:server` pointed at the same Atlas database).
+- The wrong-password limiter lives in MongoDB (`loginfails`, auto-expiring) so it works across instances.
+- Redeploy by pushing to GitHub. If phones keep an old version, bump `CACHE` in `public/sw.js`.
