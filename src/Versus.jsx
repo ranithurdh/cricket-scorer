@@ -152,7 +152,7 @@ export default function Versus() {
         <button className="chip-btn" onClick={() => { setPlayers(null); setError(''); fetchPlayerStats().then(setPlayers).catch((e) => setError(e.message)); if (name) { const n = name; setName(null); setTimeout(() => setName(n), 0); } }}>Refresh</button>
       </div>
 
-      {error && <div className="notice bad"><b>Can't reach the server.</b> Start it with <code>npm run dev:server</code> (and MongoDB), then retry.</div>}
+      {error && <div className="notice bad"><b>Can't reach the server.</b> Start it with <code>npm run dev:server</code> (and MongoDB), then retry. <small>Error: {error}</small></div>}
       {!error && !players && <div className="notice">Loading players…</div>}
 
       {players && (

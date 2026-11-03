@@ -196,7 +196,7 @@ export default function Matches() {
 
       {error && (
         <div className="notice bad">
-          <b>Can't reach the server.</b> Start it with <code>npm run dev:server</code> (and MongoDB), then retry.
+          <b>Can't reach the server.</b> Start it with <code>npm run dev:server</code> (and MongoDB), then retry. <small>Error: {error}</small>
           <button className="chip-btn" onClick={() => load(1)}>Retry</button>
         </div>
       )}
