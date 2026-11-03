@@ -1,0 +1,30 @@
+{
+  "name": "cricket-scorer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "server": "node server/index.js",
+    "dev:server": "node --watch server/index.js",
+    "recompute": "node server/recompute.js",
+    "test:stats": "node server/test/stats.test.js",
+    "test:highlights": "node server/test/highlights.test.js",
+    "test:versus": "node server/test/versus.test.js",
+    "test:auth": "node server/test/auth.test.js",
+    "test:superover": "node server/test/superover.test.js"
+  },
+  "dependencies": {
+    "cors": "2.8.5",
+    "dotenv": "16.4.7",
+    "express": "4.21.2",
+    "mongoose": "8.9.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.0"
+  }
+}
