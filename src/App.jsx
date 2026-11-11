@@ -210,6 +210,13 @@ function Match({ config, onNew }) {
       <main className="main">
         <aside className="col">
           <button className="btn cut side" onClick={() => setModal({ type: 'more' })}>⋯<small>More options</small></button>
+
+          <button
+            className="btn cut side"
+            disabled={inn.closed || inn.alone || !inn.strikerId || !inn.nonStrikerId}
+            title="Swap striker and non-striker"
+            onClick={() => dispatch({ type: 'swap' })}
+          >⇄<small>Swap batters</small></button>
           <button
             className="btn cut side" disabled={!hasBalls || saveStatus === 'saving'}
             title={hasBalls ? 'Save this match to the database now' : 'Score a ball first'}
