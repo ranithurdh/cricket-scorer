@@ -6,7 +6,7 @@
 
 // A player needs this much data before they are rated, so one lucky innings can't top the board.
 // If fewer than 2 players qualify yet, everyone with data is rated instead (see `relaxed`).
-export const MIN = { batting: 3, bowling: 5, fielding: 3 }; // innings / overs bowled / matches
+export const MIN = { batting: 3, bowling: 0, fielding: 3 }; // innings / overs bowled / matches
 export const MIN_LABEL = { batting: 'innings', bowling: 'overs', fielding: 'matches' };
 
 const W = {
