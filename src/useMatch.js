@@ -61,7 +61,7 @@ export function useMatch(config) {
     if (!events.length) return;
     let cut = events.length - 1;
     for (let i = events.length - 1; i >= 0; i--) {
-      if (['ball', 'drop', 'end_innings', 'next_innings', 'super_over', 'no_super_over'].includes(events[i].type)) { cut = i; break; }
+      if (['ball', 'swap', 'drop', 'end_innings', 'next_innings', 'super_over', 'no_super_over'].includes(events[i].type)) { cut = i; break; }
     }
     setRedoStack([...redoStack, events.slice(cut)]);
     setEvents(events.slice(0, cut));
