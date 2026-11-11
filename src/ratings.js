@@ -11,7 +11,7 @@ export const MIN_LABEL = { batting: 'innings', bowling: 'overs', fielding: 'matc
 
 const W = {
   batting:  { average: 0.30, strikeRate: 0.25, highScore: 0.10, boundaryPct: 0.20, dotPct: 0.15 },
-  bowling:  { wpm: 0.30, average: 0.20, economy: 0.25, dotPct: 0.15, epo: 0.10 },
+  bowling:  { wpm: 0.20, average: 0.20, economy: 0.35, dotPct: 0.15, epo: 0.10 },
   fielding: { cpm: 0.35, ropm: 0.25, catchPct: 0.25, dpm: 0.15 },
 };
 
