@@ -56,6 +56,12 @@ function retire(inn, id) {
   else if (inn.nonStrikerId === id) inn.nonStrikerId = null;
 }
 
+// Switch the two batters at the crease. Not a ball: no runs, balls faced or over progress change.
+function swapEnds(inn) {
+  if (inn.alone || !inn.strikerId || !inn.nonStrikerId) return;
+  [inn.strikerId, inn.nonStrikerId] = [inn.nonStrikerId, inn.strikerId];
+}
+
 function applyBall(config, inn, ev, target) {
   const { runs = 0, extra = null, wicket = null } = ev;
   const striker = inn.batters[inn.strikerId];
@@ -132,6 +138,7 @@ function feed(cfg, list, firstBat, ev) {
     if (ev.type === 'select') select(inn, ev);
     else if (ev.type === 'retire') retire(inn, ev.playerId);
     else if (ev.type === 'drop') drop(cfg, inn, ev);
+    else if (ev.type === 'swap') swapEnds(inn);
     else if (ev.type === 'ball') applyBall(cfg, inn, ev, target);
     else if (ev.type === 'end_innings') inn.closed = true;
   }
