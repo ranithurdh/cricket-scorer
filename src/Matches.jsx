@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { deleteMatch, downloadBackup, fetchMatchCards, reopenMatch, setAbandoned, setMatchDate } from './api';
-import { CLIENT_ID_KEY, CONFIG_KEY, EVENTS_KEY } from './useMatch';
+import { CLIENT_ID_KEY, CONFIG_KEY, EVENTS_KEY, OPEN_EDITOR_KEY } from './useMatch';
 import Avatar from './Avatar';
 import { useAuth } from './auth';
 
@@ -161,13 +161,14 @@ export default function Matches() {
   // Open a saved match in the scorer: undo / redo and keep scoring to correct it, and every change saves to the same match.
   const edit = async (m) => {
     const who = m.teams.map((t) => t.name).join(' vs ');
-    if (!window.confirm(`Open ${who} in the Score page? It replaces whatever match is open there (that one stays saved in the database). Use Undo / Redo and keep scoring to correct this match; changes save to it as you go.`)) return;
+    if (!window.confirm(`Open ${who} in the Score page? It replaces whatever match is open there (that one stays saved in the database). The match editor opens straight away: change any ball, flag balls out of the player stats, or revert dropped catches. Changes save to this match.`)) return;
     setBusy(true); setMsg('');
     try {
       const r = await reopenMatch(m.id);
       localStorage.setItem(CONFIG_KEY, JSON.stringify(r.config));
       localStorage.setItem(EVENTS_KEY, JSON.stringify(r.events));
       localStorage.setItem(CLIENT_ID_KEY, r.clientId);
+      localStorage.setItem(OPEN_EDITOR_KEY, '1'); // the Score page opens the match editor on load
       window.dispatchEvent(new Event('scorer:load'));
       window.location.hash = '#/score';
     } catch (e) { setMsg(`Could not open it: ${e.message}`); }
