@@ -368,3 +368,4 @@ code { background: var(--panel3); padding: 1px 6px; border-radius: 4px; user-sel
 
 /* super over section on a match card */
 .mt-so { margin: 14px 0 4px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; opacity: .8; }
+.ed-body > * { flex: none; }
