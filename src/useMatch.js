@@ -10,6 +10,12 @@ const load = () => {
 
 // One id per match, so re-saving the same match updates it in MongoDB instead of adding a duplicate.
 export const CLIENT_ID_KEY = 'cricket-match-id-v1';
+
+// The Matches page sets this when you press "Edit in scorer": the Score page then opens the match editor straight away.
+export const OPEN_EDITOR_KEY = 'cricket-open-editor-v1';
+export const consumeOpenEditor = () => {
+  try { const on = localStorage.getItem(OPEN_EDITOR_KEY) === '1'; localStorage.removeItem(OPEN_EDITOR_KEY); return on; } catch { return false; }
+};
 const getClientId = () => {
   try {
     let id = localStorage.getItem(CLIENT_ID_KEY);
@@ -61,7 +67,8 @@ export function useMatch(config) {
     if (!events.length) return;
     let cut = events.length - 1;
     for (let i = events.length - 1; i >= 0; i--) {
-      if (['ball', 'swap', 'drop', 'end_innings', 'next_innings', 'super_over', 'no_super_over'].includes(events[i].type)) { cut = i; break; }
+      const e = events[i]; // a "swap" added by the match editor (fix) travels with its ball; one you press yourself is its own step
+      if (['ball', 'drop', 'end_innings', 'next_innings', 'super_over', 'no_super_over'].includes(e.type) || (e.type === 'swap' && !e.fix)) { cut = i; break; }
     }
     setRedoStack([...redoStack, events.slice(cut)]);
     setEvents(events.slice(0, cut));
@@ -72,9 +79,11 @@ export function useMatch(config) {
     setRedoStack(redoStack.slice(0, -1));
   };
   const reset = () => { setEvents([]); setRedoStack([]); };
+  // The match editor hands back a whole corrected event list; it saves like any other change.
+  const replaceEvents = (next) => { setEvents(next); setRedoStack([]); };
 
   return {
-    state, dispatch, undo, redo, reset, saveStatus, savedAt, saveNow: persist,
+    state, events, dispatch, replaceEvents, undo, redo, reset, saveStatus, savedAt, saveNow: persist,
     canUndo: events.length > 0, canRedo: redoStack.length > 0,
     hasBalls: events.some((e) => e.type === 'ball'),
   };
