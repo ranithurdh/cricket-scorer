@@ -1,5 +1,5 @@
 // Pure scoring engine: state = computeState(config, events). No React in here.
-// Events: select{role,playerId} | ball{runs,extra,wicket} | retire{playerId} | drop{playerId} | end_innings | next_innings | super_over | no_super_over
+// Events: select{role,playerId} | swap | ball{runs,extra,wicket,statsOff} (wicket may carry noStats) | retire{playerId} | drop{playerId} | end_innings | next_innings | super_over | no_super_over
 
 const BOWLER_CREDIT = ['bowled', 'caught', 'stumped', 'other'];
 export const validKinds = (extra) =>
@@ -24,6 +24,7 @@ function newInnings(config, battingTeam) {
     batters: Object.fromEntries(players(config, battingTeam).map((p) => [p.id, fresh()])),
     bowlers: {}, fielding: {}, overBalls: [], overComplete: false, closed: false, alone: false,
     log: [], // every ball actually applied, in order (used for records like hat-tricks and first fifties)
+    dropLog: [], // every dropped catch logged, with the position of its event (used by the match editor)
   };
 }
 
@@ -31,8 +32,10 @@ function newInnings(config, battingTeam) {
 const fielder = (inn, id) => (inn.fielding[id] ??= { catches: 0, runouts: 0, drops: 0 });
 
 // A dropped catch, logged by the scorer. Only counts for someone on the fielding side.
-function drop(config, inn, { playerId }) {
-  if (players(config, inn.bowlingTeam).some((p) => p.id === playerId)) fielder(inn, playerId).drops += 1;
+function drop(config, inn, { playerId }, idx) {
+  const counted = players(config, inn.bowlingTeam).some((p) => p.id === playerId);
+  if (counted) fielder(inn, playerId).drops += 1;
+  inn.dropLog.push({ idx, playerId, counted });
 }
 
 function select(inn, { role, playerId }) {
@@ -49,6 +52,12 @@ function select(inn, { role, playerId }) {
   inn.batters[playerId].status = 'in';
 }
 
+// The two batters change ends. Not a ball: no runs, no ball faced. (Also used by the match editor to keep
+// the strike unchanged after an odd/even change to an earlier ball.)
+function swapEnds(inn) {
+  if (!inn.alone) [inn.strikerId, inn.nonStrikerId] = [inn.nonStrikerId, inn.strikerId];
+}
+
 function retire(inn, id) {
   if (!inn.batters[id]) return;
   inn.batters[id].status = 'retired';
@@ -56,13 +65,7 @@ function retire(inn, id) {
   else if (inn.nonStrikerId === id) inn.nonStrikerId = null;
 }
 
-// Switch the two batters at the crease. Not a ball: no runs, balls faced or over progress change.
-function swapEnds(inn) {
-  if (inn.alone || !inn.strikerId || !inn.nonStrikerId) return;
-  [inn.strikerId, inn.nonStrikerId] = [inn.nonStrikerId, inn.strikerId];
-}
-
-function applyBall(config, inn, ev, target) {
+function applyBall(config, inn, ev, target, idx) {
   const { runs = 0, extra = null, wicket = null } = ev;
   const striker = inn.batters[inn.strikerId];
   const bowler = inn.bowlers[inn.bowlerId];
@@ -108,7 +111,12 @@ function applyBall(config, inn, ev, target) {
   }
 
   inn.overBalls.push({ runs, extra, batRuns, extraRuns, legal, wicket: wicketRec, bowlerId: inn.bowlerId });
+  // Position of this ball in the match: over number (1-based) and the match totals right after it.
+  const over = Math.floor((legal ? inn.legalBalls - 1 : inn.legalBalls) / config.ballsPerOver) + 1;
   inn.log.push({
+    idx, over, runsAfter: inn.runs, wicketsAfter: inn.wickets,
+    // Editor flags: statsOff = leave this whole ball out of player stats; wicketOff = leave only its wicket out.
+    statsOff: !!ev.statsOff, wicketOff: !!(wicketRec && wicket.noStats),
     bowlerId: inn.bowlerId, strikerId: strikerAtBall, nonStrikerId: nonStrikerAtBall, legal, extra, batRuns, extraRuns,
     strikerRuns: striker.runs, strikerBalls: striker.balls, // the striker's totals after this ball
     wicket: wicketRec ? { outId: wicketRec.outId, kind: wicketRec.kind, fielderId: wicketRec.fielderId ?? null, credited } : null,
@@ -129,7 +137,7 @@ function applyBall(config, inn, ev, target) {
 }
 
 // One innings' worth of events. `list` is the innings so far (1 or 2), `firstBat` who bats first in it.
-function feed(cfg, list, firstBat, ev) {
+function feed(cfg, list, firstBat, ev, idx) {
   const inn = list[list.length - 1];
   const target = list.length === 2 ? list[0].runs + 1 : null;
   if (ev.type === 'next_innings') {
@@ -137,9 +145,9 @@ function feed(cfg, list, firstBat, ev) {
   } else if (!inn.closed) {
     if (ev.type === 'select') select(inn, ev);
     else if (ev.type === 'retire') retire(inn, ev.playerId);
-    else if (ev.type === 'drop') drop(cfg, inn, ev);
     else if (ev.type === 'swap') swapEnds(inn);
-    else if (ev.type === 'ball') applyBall(cfg, inn, ev, target);
+    else if (ev.type === 'drop') drop(cfg, inn, ev, idx);
+    else if (ev.type === 'ball') applyBall(cfg, inn, ev, target, idx);
     else if (ev.type === 'end_innings') inn.closed = true;
   }
 }
@@ -159,7 +167,8 @@ export function computeState(config, events) {
   const supers = []; // { cfg, firstBat, innings }
   let declined = false;
 
-  for (const ev of events) {
+  for (let idx = 0; idx < events.length; idx++) {
+    const ev = events[idx];
     const cur = supers[supers.length - 1];
     if (ev.type === 'super_over' || ev.type === 'no_super_over') {
       const list = cur ? cur.innings : innings;
@@ -169,8 +178,8 @@ export function computeState(config, events) {
       const firstBat = supers.length % 2 === 0 ? 1 - config.battingFirst : config.battingFirst;
       const cfg = { ...config, overs: 1 };
       supers.push({ cfg, firstBat, innings: [newInnings(cfg, firstBat)] });
-    } else if (!cur) feed(config, innings, config.battingFirst, ev);
-    else if (!finished(cur.innings)) feed(cur.cfg, cur.innings, cur.firstBat, ev);
+    } else if (!cur) feed(config, innings, config.battingFirst, ev, idx);
+    else if (!finished(cur.innings)) feed(cur.cfg, cur.innings, cur.firstBat, ev, idx);
   }
 
   const last = supers[supers.length - 1];

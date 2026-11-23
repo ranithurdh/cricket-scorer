@@ -21,6 +21,40 @@ export function validateMatch({ config, events }) {
   return null;
 }
 
+// The match editor can flag a ball (statsOff) or just its wicket (wicketOff) so it does not count towards player stats.
+// The match itself (score, result, scorecard) is untouched; here the ball's contribution is taken back out of the
+// player rows, mirroring exactly what the engine added for it.
+function leaveFlaggedOut(rows, log, bpo) {
+  for (const e of log) {
+    if (!e.statsOff && !e.wicketOff) continue;
+    const bat = rows.get(e.strikerId), bowl = rows.get(e.bowlerId);
+    const charged = e.extra === 'wide' || e.extra === 'noball' ? e.extraRuns : 0; // wides / no-balls are charged to the bowler
+    if (e.statsOff) {
+      if (bat) {
+        const b = bat.batting;
+        if (e.extra !== 'wide') { b.balls -= 1; if (e.batRuns === 0) b.dots -= 1; }
+        b.runs -= e.batRuns;
+        if (e.batRuns === 4) b.fours -= 1;
+        if (e.batRuns === 6) b.sixes -= 1;
+      }
+      if (bowl) {
+        const w = bowl.bowling;
+        w.runs -= e.batRuns + charged;
+        w.extras -= charged;
+        if (e.legal) { w.balls -= 1; w.oversEq = w.balls / bpo; if (e.batRuns + e.extraRuns === 0) w.dots -= 1; }
+      }
+    }
+    if (e.wicket) { // a flagged ball takes its wicket with it
+      const out = rows.get(e.wicket.outId);
+      if (out) { out.batting.out = false; out.batting.dismissal = null; }
+      if (e.wicket.credited && bowl) bowl.bowling.wickets -= 1;
+      const fld = e.wicket.fielderId && rows.get(e.wicket.fielderId);
+      if (fld && e.wicket.kind === 'caught') fld.fielding.catches -= 1;
+      if (fld && e.wicket.kind === 'runout') fld.fielding.runouts -= 1;
+    }
+  }
+}
+
 // `roster` decides who counts as a dorm member (and under what name); it comes from the saved players in the database.
 export function summarize(config, events, roster = DEFAULT_ROSTER) {
   const state = computeState(config, events);
@@ -78,6 +112,7 @@ export function summarize(config, events, roster = DEFAULT_ROSTER) {
       const row = rows.get(id);
       if (row) row.fielding = { ...f };
     }
+    leaveFlaggedOut(rows, inn.log, bpo);
   }
 
   return {

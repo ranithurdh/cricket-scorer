@@ -11,9 +11,10 @@ import { AuthContext, useAuthState } from './auth';
 import { HomeIcon, VersusIcon, ScoreIcon, LeaderboardIcon, MatchesIcon, SettingsIcon } from './Icons';
 import { useSiteSettings } from './siteSettings';
 import { RosterContext, useRosterState } from './roster';
-import { useMatch, EVENTS_KEY, CLIENT_ID_KEY, CONFIG_KEY } from './useMatch';
+import { useMatch, consumeOpenEditor, EVENTS_KEY, CLIENT_ID_KEY, CONFIG_KEY } from './useMatch';
 import { players, nameOf, formatOvers } from './engine';
 import Field from './Field';
+import EditMatch from './EditMatch';
 import { Overlay, Picker, DismissalModal } from './Modals';
 
 const LABEL = { bye: 'Bye', legbye: 'Leg bye', wide: 'WD', noball: 'NB' };
@@ -29,7 +30,8 @@ function token(b) {
 }
 
 function Match({ config, onNew }) {
-  const { state, dispatch, undo, redo, canUndo, canRedo, hasBalls, saveStatus, savedAt, saveNow } = useMatch(config);
+  const { state, events, dispatch, replaceEvents, undo, redo, canUndo, canRedo, hasBalls, saveStatus, savedAt, saveNow } = useMatch(config);
+  const [editor, setEditor] = useState(consumeOpenEditor); // the full match editor (opens straight away from Matches > Edit in scorer)
   const [mods, setMods] = useState({ extra: null, out: false });
   const [modal, setModal] = useState(null);
   const [flash, setFlash] = useState('');
@@ -210,13 +212,13 @@ function Match({ config, onNew }) {
       <main className="main">
         <aside className="col">
           <button className="btn cut side" onClick={() => setModal({ type: 'more' })}>⋯<small>More options</small></button>
-
           <button
             className="btn cut side"
             disabled={inn.closed || inn.alone || !inn.strikerId || !inn.nonStrikerId}
             title="Swap striker and non-striker"
             onClick={() => dispatch({ type: 'swap' })}
           >⇄<small>Swap batters</small></button>
+          <button className="btn cut side" disabled={!events.length} title="Edit every ball, flag balls out of the stats, revert dropped catches" onClick={() => setEditor(true)}>✎<small>Edit match</small></button>
           <button
             className="btn cut side" disabled={!hasBalls || saveStatus === 'saving'}
             title={hasBalls ? 'Save this match to the database now' : 'Score a ball first'}
@@ -257,6 +259,13 @@ function Match({ config, onNew }) {
         </div>
       </footer>
       {overlay}
+      {editor && (
+        <EditMatch
+          config={config} events={events}
+          onClose={() => setEditor(false)}
+          onSave={(next) => { replaceEvents(next); setEditor(false); setFlash('Changes applied, saving…'); }}
+        />
+      )}
     </div>
   );
 }
