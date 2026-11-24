@@ -33,6 +33,24 @@ function bestOf(players) {
   };
 }
 
+// Everyone with a batting and/or bowling rating. Players rated in both are ranked by the average of the two (the
+// all-rounder score, same rule as the "Best all-rounder" card); players with only one rating are listed after them.
+function boardOf(players) {
+  const bat = overallRatings(players, 'batting', hasBat).map;
+  const bowl = overallRatings(players, 'bowling', hasBowl).map;
+  const rows = players
+    .map((p) => {
+      const b = bat.get(p.name)?.score ?? null, w = bowl.get(p.name)?.score ?? null;
+      return { p, bat: b, bowl: w, both: b != null && w != null ? (b + w) / 2 : null };
+    })
+    .filter((r) => r.bat != null || r.bowl != null);
+  const ranked = rows.filter((r) => r.both != null)
+    .sort((a, b) => b.both - a.both || b.p.matches - a.p.matches || a.p.name.localeCompare(b.p.name));
+  const rest = rows.filter((r) => r.both == null)
+    .sort((a, b) => (b.bat ?? b.bowl) - (a.bat ?? a.bowl) || a.p.name.localeCompare(b.p.name));
+  return { ranked, rest };
+}
+
 function BestCard({ label, accent, data }) {
   return (
     <div className="best-card cut" style={{ '--accent': accent }}>
@@ -49,42 +67,92 @@ function BestCard({ label, accent, data }) {
   );
 }
 
-function Record({ icon, title, accent, who, value, detail, empty }) {
+const fmt = (v) => (v == null ? '–' : v.toFixed(1));
+
+function AllRounderBoard({ board }) {
+  const { ranked, rest } = board;
+  return (
+    <section className="rec cut ar-board" style={{ '--accent': 'var(--lime)' }}>
+      <div className="rec-title"><span aria-hidden="true">🏅</span><small>Leaderboard · best all-rounder</small></div>
+      {ranked.length + rest.length === 0 ? <p className="home-none">Not enough matches yet.</p> : (
+        <div className="ar-table">
+          <div className="ar-row ar-head"><span /><span>Player</span><span>Bat</span><span>Bowl</span><span>All-round</span></div>
+          {ranked.map((r, i) => (
+            <div key={r.p.name} className="ar-row">
+              <span className="ar-place">{i + 1}</span>
+              <span className="ar-who"><Avatar name={r.p.name} photo={r.p.photo} size={30} /><b>{r.p.name}</b></span>
+              <span>{fmt(r.bat)}</span><span>{fmt(r.bowl)}</span>
+              <span className="ar-all">{fmt(r.both)}</span>
+            </div>
+          ))}
+          {rest.map((r) => (
+            <div key={r.p.name} className="ar-row dim">
+              <span className="ar-place">–</span>
+              <span className="ar-who"><Avatar name={r.p.name} photo={r.p.photo} size={30} /><b>{r.p.name}</b></span>
+              <span>{fmt(r.bat)}</span><span>{fmt(r.bowl)}</span>
+              <span className="ar-all">–</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {rest.length > 0 && <small className="home-sub">Dimmed players need a rating in both batting and bowling to be ranked.</small>}
+    </section>
+  );
+}
+
+// A record card showing the top 3. rows: [{ key, avatars: [{ name, photo }], title, detail, value }]
+function TopRecord({ icon, title, accent, rows, empty }) {
   return (
     <article className="rec cut" style={{ '--accent': accent }}>
       <div className="rec-title"><span aria-hidden="true">{icon}</span><small>{title}</small></div>
-      {who ? (
-        <div className="rec-body">
-          {who.name && <Avatar name={who.name} photo={who.photo} size={42} />}
-          <div className="rec-who">
-            <b>{who.name ?? value}</b>
-            {detail && <small>{detail}</small>}
-          </div>
-          {who.name && value && <span className="rec-value">{value}</span>}
-        </div>
+      {rows.length ? (
+        <ol className="rec-top">
+          {rows.slice(0, 3).map((row, i) => (
+            <li key={row.key} className="rec-body">
+              <span className="rec-rank">{i + 1}</span>
+              <div className={row.avatars.length > 1 ? 'pair' : undefined}>
+                {row.avatars.map((a) => <Avatar key={a.name} name={a.name} photo={a.photo} size={row.avatars.length > 1 ? 30 : 38} />)}
+              </div>
+              <div className="rec-who"><b>{row.title}</b>{row.detail && <small>{row.detail}</small>}</div>
+              <span className="rec-value">{row.value}</span>
+            </li>
+          ))}
+        </ol>
       ) : <p className="home-none">{empty}</p>}
     </article>
   );
 }
 
-// A record that can belong to several people (or be tied): one row each.
-function PeopleRecord({ icon, title, accent, items, empty }) {
-  return (
-    <article className="rec cut" style={{ '--accent': accent }}>
-      <div className="rec-title"><span aria-hidden="true">{icon}</span><small>{title}</small></div>
-      {items.length ? (
-        <ul className="rec-people">
-          {items.map((p) => (
-            <li key={p.name} className="rec-body">
-              <Avatar name={p.name} photo={p.photo} size={38} />
-              <div className="rec-who"><b>{p.name}</b>{p.detail && <small>{p.detail}</small>}</div>
-              <span className="rec-value">{p.value}</span>
-            </li>
-          ))}
-        </ul>
-      ) : <p className="home-none">{empty}</p>}
-    </article>
-  );
+// The server sends top-3 lists; if an older server answers, fall back to the single best it still sends.
+const one = (x) => (x ? [x] : []);
+const who = (x) => ({ name: x.name, photo: x.photo });
+function topRows(r) {
+  return {
+    scores: (r.topScores ?? one(r.highestScore)).map((x) => ({
+      key: `${x.name}-${x.when}-${x.runs}-${x.balls}`, avatars: [who(x)], title: x.name, value: `${x.runs}${x.notOut ? '*' : ''}`,
+      detail: `${x.balls} balls · ${x.fours}×4 ${x.sixes}×6 · vs ${x.against} · ${day(x.when)}`,
+    })),
+    spells: (r.topSpells ?? one(r.bestSpell)).map((x) => ({
+      key: `${x.name}-${x.when}`, avatars: [who(x)], title: x.name, value: `${x.wickets}/${x.runs}`,
+      detail: `${x.overs} ov · vs ${x.against} · ${day(x.when)}`,
+    })),
+    fifties: r.fifties.map((x) => ({ key: x.name, avatars: [who(x)], title: x.name, value: `×${x.count}`, detail: `best ${x.best}` })),
+    hattricks: r.hattricks.map((x) => ({ key: x.name, avatars: [who(x)], title: x.name, value: `×${x.count}` })),
+    sixes: (r.topSixes ?? (r.sixMachine?.players ?? []).map((x) => ({ ...x, count: r.sixMachine.sixes }))).map((x) => ({
+      key: x.name, avatars: [who(x)], title: x.name, value: x.count, detail: 'sixes in total',
+    })),
+    ducks: (r.topDucks ?? (r.mostDucks?.players ?? []).map((x) => ({ ...x, count: r.mostDucks.ducks }))).map((x) => ({
+      key: x.name, avatars: [who(x)], title: x.name, value: x.count, detail: x.count === 1 ? 'duck (out for 0)' : 'ducks (out for 0)',
+    })),
+    partnerships: (r.topPartnerships ?? one(r.bestPartnership)).map((x) => ({
+      key: `${x.players.map((p) => p.name).join('+')}-${x.when}`, avatars: x.players.map(who), title: x.players.map((p) => p.name).join(' & '),
+      value: x.runs, detail: `${x.balls} balls · ${x.team} vs ${x.against} · ${day(x.when)}`,
+    })),
+    teams: (r.topTeams ?? one(r.mostWins)).map((x) => ({
+      key: x.players.map((p) => p.name).join('+'), avatars: x.players.map(who), title: x.players.map((p) => p.name).join(', '),
+      value: x.wins, detail: `${x.wins} win${x.wins === 1 ? '' : 's'} from ${x.played} · ${x.winPct}% · played as ${x.names.join(', ')}`,
+    })),
+  };
 }
 
 // Bottom of the Home page: who you are signed in as, or a way to sign in.
@@ -125,6 +193,8 @@ export default function Home() {
   useEffect(load, [load]);
 
   const best = useMemo(() => (players ? bestOf(players) : null), [players]);
+  const board = useMemo(() => (players ? boardOf(players) : null), [players]);
+  const rows = useMemo(() => (records ? topRows(records) : null), [records]);
   const r = records;
 
   return (
@@ -153,68 +223,18 @@ export default function Home() {
         </div>
       )}
 
+      {board && <AllRounderBoard board={board} />}
+
       {r && (
         <div className="rec-grid">
-          <Record
-            icon="🏏" title="Highest score" accent="var(--hunter)" who={r.highestScore}
-            value={r.highestScore && `${r.highestScore.runs}${r.highestScore.notOut ? '*' : ''}`}
-            detail={r.highestScore && `${r.highestScore.balls} balls · ${r.highestScore.fours}×4 ${r.highestScore.sixes}×6 · vs ${r.highestScore.against} · ${day(r.highestScore.when)}`}
-            empty="No innings yet."
-          />
-          <Record
-            icon="🎯" title="Best spell" accent="var(--sage)" who={r.bestSpell}
-            value={r.bestSpell && `${r.bestSpell.wickets}/${r.bestSpell.runs}`}
-            detail={r.bestSpell && `${r.bestSpell.overs} ov · vs ${r.bestSpell.against} · ${day(r.bestSpell.when)}`}
-            empty="No wickets yet."
-          />
-          <PeopleRecord
-            icon="5️⃣0️⃣" title="50s" accent="var(--lime)"
-            items={r.fifties.map((f) => ({ ...f, value: `×${f.count}`, detail: `best ${f.best}` }))}
-            empty="Nobody has made a 50 yet. Be the first."
-          />
-          <PeopleRecord
-            icon="🎩" title="Hat-tricks" accent="var(--brick)"
-            items={r.hattricks.map((h) => ({ ...h, value: `×${h.count}` }))}
-            empty="Nobody has taken a hat-trick yet. Run outs don't count."
-          />
-          <PeopleRecord
-            icon="💣" title="Six machine" accent="var(--hunter)"
-            items={(r.sixMachine?.players ?? []).map((p) => ({ ...p, value: r.sixMachine.sixes, detail: 'sixes in total' }))}
-            empty="No sixes hit yet."
-          />
-          <PeopleRecord
-            icon="🦆" title="Most ducks" accent="var(--brick)"
-            items={(r.mostDucks?.players ?? []).map((p) => ({ ...p, value: r.mostDucks.ducks, detail: r.mostDucks.ducks === 1 ? 'duck (out for 0)' : 'ducks (out for 0)' }))}
-            empty="No ducks yet. Nobody has been out for 0."
-          />
-          <article className="rec cut" style={{ '--accent': 'var(--sage)' }}>
-            <div className="rec-title"><span aria-hidden="true">🤝</span><small>Highest partnership</small></div>
-            {r.bestPartnership ? (
-              <div className="rec-body">
-                <div className="pair">{r.bestPartnership.players.map((p) => <Avatar key={p.name} name={p.name} photo={p.photo} size={42} />)}</div>
-                <div className="rec-who">
-                  <b>{r.bestPartnership.players.map((p) => p.name).join(' & ')}</b>
-                  <small>{r.bestPartnership.balls} balls · {r.bestPartnership.team} vs {r.bestPartnership.against} · {day(r.bestPartnership.when)}</small>
-                </div>
-                <span className="rec-value">{r.bestPartnership.runs}</span>
-              </div>
-            ) : <p className="home-none">No partnership between two saved players yet.</p>}
-          </article>
-          <article className="rec cut" style={{ '--accent': 'var(--moss)' }}>
-            <div className="rec-title"><span aria-hidden="true">🏆</span><small>Most won team</small></div>
-            {r.mostWins ? (
-              <>
-                <div className="rec-avatars">{r.mostWins.players.map((p) => <Avatar key={p.name} name={p.name} photo={p.photo} size={38} />)}</div>
-                <div className="rec-body">
-                  <div className="rec-who">
-                    <b>{r.mostWins.players.map((p) => p.name).join(', ')}</b>
-                    <small>{r.mostWins.wins} win{r.mostWins.wins === 1 ? '' : 's'} from {r.mostWins.played} · {r.mostWins.winPct}% · played as {r.mostWins.names.join(', ')}</small>
-                  </div>
-                  <span className="rec-value">{r.mostWins.wins}</span>
-                </div>
-              </>
-            ) : <p className="home-none">No team has won a match yet.</p>}
-          </article>
+          <TopRecord icon="🏏" title="Highest score · top 3" accent="var(--hunter)" rows={rows.scores} empty="No innings yet." />
+          <TopRecord icon="🎯" title="Best spell · top 3" accent="var(--sage)" rows={rows.spells} empty="No wickets yet." />
+          <TopRecord icon="5️⃣0️⃣" title="50s · top 3" accent="var(--lime)" rows={rows.fifties} empty="Nobody has made a 50 yet. Be the first." />
+          <TopRecord icon="🎩" title="Hat-tricks · top 3" accent="var(--brick)" rows={rows.hattricks} empty="Nobody has taken a hat-trick yet. Run outs don't count." />
+          <TopRecord icon="💣" title="Six machine · top 3" accent="var(--hunter)" rows={rows.sixes} empty="No sixes hit yet." />
+          <TopRecord icon="🦆" title="Most ducks · top 3" accent="var(--brick)" rows={rows.ducks} empty="No ducks yet. Nobody has been out for 0." />
+          <TopRecord icon="🤝" title="Highest partnership · top 3" accent="var(--sage)" rows={rows.partnerships} empty="No partnership between two saved players yet." />
+          <TopRecord icon="🏆" title="Most won team · top 3" accent="var(--moss)" rows={rows.teams} empty="No team has won a match yet." />
         </div>
       )}
 

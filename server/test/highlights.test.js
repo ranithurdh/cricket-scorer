@@ -57,6 +57,20 @@ assert.equal(h.mostWins.wins, 2); assert.equal(h.mostWins.played, 2);
 assert.deepEqual(names(h.mostWins.players).sort(), ['Nithil', 'Ranithu', 'Sadaham', 'Sandanu']);
 assert.deepEqual(h.mostWins.names, ['Crimson', 'Reds'], 'names used, newest first');
 
+// Top 3 of each record (the single best is still the first of them).
+{
+  const t = highlights([m1, m2, m4], DEFAULT_ROSTER);
+  assert.deepEqual(t.topScores[0], t.highestScore); assert.deepEqual(t.topSpells[0], t.bestSpell);
+  assert.deepEqual(t.topPartnerships[0], t.bestPartnership); assert.deepEqual(t.topTeams[0], t.mostWins);
+  assert.equal(t.topScores.length, 3, 'three matches, so three best innings'); assert.ok(t.topScores[0].runs >= t.topScores[1].runs && t.topScores[1].runs >= t.topScores[2].runs);
+  assert.ok(t.topSpells.length <= 3 && t.topPartnerships.length <= 3);
+  assert.deepEqual(t.topSixes.map((x) => [x.name, x.count]), [['Ranithu', 27]], 'only Ranithu hit sixes');
+  assert.deepEqual(t.topDucks.map((x) => [x.name, x.count]), [['Nithil', 2], ['Sandanu', 1]]);
+  assert.ok(t.topTeams.length >= 1 && t.topTeams.length <= 3);
+  const none = highlights([], DEFAULT_ROSTER);
+  assert.deepEqual([none.topScores, none.topSpells, none.topPartnerships, none.topTeams, none.topSixes, none.topDucks], [[], [], [], [], [], []]);
+}
+
 // Unfinished matches are ignored; empty data gives empty records.
 h = highlights([{ ...m2, status: 'in_progress' }], DEFAULT_ROSTER);
 assert.equal(h.highestScore, null); assert.deepEqual(h.fifties, []); assert.equal(h.sixMachine, null);

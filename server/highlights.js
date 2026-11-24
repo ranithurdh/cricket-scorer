@@ -20,7 +20,7 @@ const byCount = (a, b) => b.count - a.count || a.name.localeCompare(b.name);
 export function highlights(matches, roster = DEFAULT_ROSTER) {
   const done = matches.filter((m) => m.status === 'completed').sort((a, b) => time(a) - time(b));
 
-  let highestScore = null, bestSpell = null, bestPartnership = null;
+  const scores = [], spells = [], partnerships = []; // every innings / spell / match-best partnership; sorted and cut to the top 3 below
   const fifties = new Map(), hattricks = new Map(), sixes = new Map(), ducks = new Map();
   const teams = new Map(); // the same set of saved players = the same team, whatever it was called that day
 
@@ -48,16 +48,13 @@ export function highlights(matches, roster = DEFAULT_ROSTER) {
       if (!person) continue;
       const bat = p.batting ?? {}, bowl = p.bowling ?? {};
       if (bat.batted) {
-        const better = !highestScore || bat.runs > highestScore.runs || (bat.runs === highestScore.runs && bat.balls < highestScore.balls);
-        if (better) highestScore = { ...person, runs: bat.runs, balls: bat.balls, fours: bat.fours, sixes: bat.sixes, notOut: !bat.out, against: against(p.team), when };
+        scores.push({ ...person, runs: bat.runs, balls: bat.balls, fours: bat.fours, sixes: bat.sixes, notOut: !bat.out, against: against(p.team), when });
         if (bat.runs >= 50) { const e = bump(fifties, person); e.best = Math.max(e.best ?? 0, bat.runs); }
         if (bat.sixes > 0) bump(sixes, person, bat.sixes);
         if (bat.out && bat.runs === 0) bump(ducks, person);
       }
       if ((bowl.balls ?? 0) > 0 && bowl.wickets > 0) {
-        const b = bestSpell;
-        const better = !b || bowl.wickets > b.wickets || (bowl.wickets === b.wickets && (bowl.runs < b.runs || (bowl.runs === b.runs && bowl.balls < b.balls)));
-        if (better) bestSpell = { ...person, wickets: bowl.wickets, runs: bowl.runs, balls: bowl.balls, overs: formatOvers(bowl.balls, bpo), against: against(p.team), when };
+        spells.push({ ...person, wickets: bowl.wickets, runs: bowl.runs, balls: bowl.balls, overs: formatOvers(bowl.balls, bpo), against: against(p.team), when });
       }
     }
 
@@ -65,9 +62,7 @@ export function highlights(matches, roster = DEFAULT_ROSTER) {
     const f = factsFor(m, roster);
     for (const h of f.hattricks ?? []) { const person = who(roster, h.name); if (person) bump(hattricks, person, h.count); }
     const part = f.partnership, pp = part && part.players.map((n) => who(roster, n));
-    if (pp && pp.every(Boolean) && (!bestPartnership || part.runs > bestPartnership.runs || (part.runs === bestPartnership.runs && part.balls < bestPartnership.balls))) {
-      bestPartnership = { players: pp, runs: part.runs, balls: part.balls, team: part.team, against: part.against, when };
-    }
+    if (pp && pp.every(Boolean)) partnerships.push({ players: pp, runs: part.runs, balls: part.balls, team: part.team, against: part.against, when });
   }
 
   const list = (map) => [...map.values()].sort(byCount);
@@ -76,20 +71,32 @@ export function highlights(matches, roster = DEFAULT_ROSTER) {
     return all.length ? { count: all[0].count, players: all.filter((e) => e.count === all[0].count).map(({ name, photo }) => ({ name, photo })) } : null;
   };
 
+  // Top 3 of each record. Matches are walked oldest first and the sorts are stable, so on a perfect tie the earlier one stays ahead.
+  const TOP = 3;
+  scores.sort((a, b) => b.runs - a.runs || a.balls - b.balls);
+  spells.sort((a, b) => b.wickets - a.wickets || a.runs - b.runs || a.balls - b.balls);
+  partnerships.sort((a, b) => b.runs - a.runs || a.balls - b.balls);
   // most wins; ties go to the better win rate, then the one with more matches
-  const best = [...teams.values()].filter((t) => t.wins > 0)
-    .sort((a, b) => b.wins - a.wins || b.wins / b.played - a.wins / a.played || b.played - a.played || a.members.join().localeCompare(b.members.join()))[0] ?? null;
+  const bestTeams = [...teams.values()].filter((t) => t.wins > 0)
+    .sort((a, b) => b.wins - a.wins || b.wins / b.played - a.wins / a.played || b.played - a.played || a.members.join().localeCompare(b.members.join()))
+    .slice(0, TOP)
+    .map((best) => ({
+      players: best.members.map((n) => who(roster, n)), names: best.names.slice(0, 3),
+      wins: best.wins, played: best.played, winPct: Math.round((best.wins / best.played) * 1000) / 10,
+    }));
+  const rows = (map) => list(map).slice(0, TOP).map(({ name, photo, count }) => ({ name, photo, count }));
 
   return {
     matches: done.length,
-    highestScore, bestSpell, bestPartnership,
+    // the single best of each (what the Home cards used to show) ...
+    highestScore: scores[0] ?? null, bestSpell: spells[0] ?? null, bestPartnership: partnerships[0] ?? null,
+    // ... and the top 3 of each
+    topScores: scores.slice(0, TOP), topSpells: spells.slice(0, TOP), topPartnerships: partnerships.slice(0, TOP), topTeams: bestTeams,
+    topSixes: rows(sixes), topDucks: rows(ducks),
     fifties: list(fifties).map(({ name, photo, count, best: top }) => ({ name, photo, count, best: top })),
     hattricks: list(hattricks).map(({ name, photo, count }) => ({ name, photo, count })),
     sixMachine: (() => { const t = top(sixes); return t && { sixes: t.count, players: t.players }; })(),
     mostDucks: (() => { const t = top(ducks); return t && { ducks: t.count, players: t.players }; })(),
-    mostWins: best && {
-      players: best.members.map((n) => who(roster, n)), names: best.names.slice(0, 3),
-      wins: best.wins, played: best.played, winPct: Math.round((best.wins / best.played) * 1000) / 10,
-    },
+    mostWins: bestTeams[0] ?? null,
   };
 }

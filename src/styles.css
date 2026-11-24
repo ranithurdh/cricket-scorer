@@ -369,3 +369,22 @@ code { background: var(--panel3); padding: 1px 6px; border-radius: 4px; user-sel
 /* super over section on a match card */
 .mt-so { margin: 14px 0 4px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; opacity: .8; }
 .ed-body > * { flex: none; }
+
+/* ---------- Home: all-rounder leaderboard + top-3 cards ---------- */
+.ar-board { gap: 6px; }
+.ar-table { display: flex; flex-direction: column; }
+.ar-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) 46px 46px 66px; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; text-align: right; }
+.ar-row.ar-head { border-top: 0; padding-top: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted, #6b7a63); }
+.ar-row > :nth-child(2) { text-align: left; }
+.ar-row.dim { opacity: 0.55; }
+.ar-place { font-family: var(--display); font-size: 20px; line-height: 1; color: var(--hunter); text-align: left; }
+.ar-row:nth-child(2) .ar-place { color: var(--moss); }
+.ar-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ar-who b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ar-all { font-family: var(--display); font-size: 22px; line-height: 1; color: var(--hunter); }
+.rec-top { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rec-top .rec-body { gap: 8px; }
+.rec-top .rec-who b { font-size: 16px; }
+.rec-top .rec-value { font-size: 26px; }
+.rec-rank { font-family: var(--display); font-size: 20px; line-height: 1; width: 16px; color: var(--hunter); text-align: center; flex: none; }
+.rec-top li:first-child .rec-rank { color: var(--moss); }
