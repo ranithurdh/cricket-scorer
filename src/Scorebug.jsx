@@ -57,22 +57,27 @@ function LiveBody({ state }) {
 function BattersBody({ state }) {
   const { config, current: inn } = state;
   const p = partnership(inn);
-  const row = (id, star) => {
+  const cell = (id, star) => {
     const b = inn.batters[id];
     if (!b) return null;
     return (
-      <div key={id} className={`gx-row ${star ? 'on' : 'dim'}`}>
-        <span className="gx-name">{star && <em className="ptr">▶</em>}{nameOf(config, id)}</span>
-        <b>{b.runs}</b><span>{b.balls}</span><span>{b.fours}</span><span>{b.sixes}</span><span>{fixed(strikeRate(b.runs, b.balls))}</span>
+      <div key={id} className={`gx-bcell ${star ? 'on' : 'dim'}`}>
+        <div className="gx-bwho">
+          <span className="gx-name">{star && <em className="ptr">▶</em>}{nameOf(config, id)}</span>
+          <small>{b.fours}×4 · {b.sixes}×6 · SR {fixed(strikeRate(b.runs, b.balls))}</small>
+        </div>
+        <b>{b.runs}<small>({b.balls})</small></b>
       </div>
     );
   };
   return (
-    <div className="gx-body table">
-      <div className="gx-row head"><span>Batter</span><span>R</span><span>B</span><span>4s</span><span>6s</span><span>SR</span></div>
-      {row(inn.strikerId, true)}
-      {row(inn.nonStrikerId, false)}
-      <div className="gx-foot"><span>Partnership</span><b>{p.runs}</b><small>({p.balls})</small></div>
+    <div className="gx-body batters">
+      {cell(inn.strikerId, true)}
+      {cell(inn.nonStrikerId, false)}
+      <div className="gx-bcell part">
+        <div className="gx-bwho"><span className="gx-name">Partnership</span></div>
+        <b>{p.runs}<small>({p.balls})</small></b>
+      </div>
     </div>
   );
 }
@@ -97,30 +102,6 @@ function BowlerBody({ state }) {
   );
 }
 
-function TargetBody({ v }) {
-  if (v.kind === 'result') return <div className="gx-body result"><b className="gx-result">{v.text}</b></div>;
-  if (v.kind === 'projected') {
-    return (
-      <div className="gx-body target">
-        <div className="gx-need">
-          <div><span>Projected score</span></div>
-          <div><b>{v.projected ?? '-'}</b><span>at this rate</span></div>
-        </div>
-      </div>
-    );
-  }
-  const set = v.kind === 'set';
-  return (
-    <div className="gx-body target">
-      <div className="gx-need">
-        <div><span>Need</span><b>{v.need}</b><span>{plural(v.need, 'run')}</span></div>
-        <div><span>from</span><b>{v.left}</b><span>{plural(v.left, 'ball')}</span></div>
-        {set && <small className="gx-for">{v.team} to chase</small>}
-      </div>
-    </div>
-  );
-}
-
 const Tile = ({ label, value, cls = '' }) => <div className={`gx-tile ${cls}`}><b>{value}</b><small>{label}</small></div>;
 
 function TargetStats({ v }) {
@@ -129,7 +110,7 @@ function TargetStats({ v }) {
       <div className="gx-stats">
         <Tile label="Run rate" value={fixed(v.crr, 2)} />
         <Tile label="Overs left" value={v.oversLeft} />
-        <Tile label="Wickets in hand" value={v.inHand} />
+        <Tile label="Wkts in hand" value={v.inHand} />
       </div>
     );
   }
@@ -144,9 +125,32 @@ function TargetStats({ v }) {
   return (
     <div className="gx-stats">
       <Tile label="Target" value={v.target} />
-      <Tile label="Required rate" value={fixed(v.rrr, 2)} cls="hot" />
+      <Tile label="Req. rate" value={fixed(v.rrr, 2)} cls="hot" />
       <Tile label="Run rate" value={fixed(v.crr, 2)} />
-      <Tile label="Wickets in hand" value={v.inHand} />
+      <Tile label="Wkts in hand" value={v.inHand} />
+    </div>
+  );
+}
+
+function TargetBody({ v }) {
+  if (v.kind === 'result') return <div className="gx-body result"><b className="gx-result">{v.text}</b></div>;
+  const set = v.kind === 'set';
+  return (
+    <div className="gx-body target">
+      {v.kind === 'projected' ? (
+        <div className="gx-need">
+          <div><span>Projected score</span><b>{v.projected ?? '-'}</b><span>at this rate</span></div>
+        </div>
+      ) : (
+        <div className="gx-need">
+          <div>
+            <span>Need</span><b>{v.need}</b><span>{plural(v.need, 'run')}</span>
+            <span>from</span><b>{v.left}</b><span>{plural(v.left, 'ball')}</span>
+          </div>
+          {set && <small className="gx-for">{v.team} to chase</small>}
+        </div>
+      )}
+      <TargetStats v={v} />
     </div>
   );
 }
@@ -196,7 +200,6 @@ export default function Scorebug({ state, mode, popup }) {
             {!solo && <TeamBlock state={state} />}
             {body}
           </div>
-          {tv && tv.kind !== 'result' && <TargetStats v={tv} />}
           {note && <div className="gx-note"><span>{note.left}</span>{note.right && <span>{note.right}</span>}</div>}
         </div>
       </div>
