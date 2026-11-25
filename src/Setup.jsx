@@ -11,7 +11,7 @@ const shuffle = (arr) => {
   return a;
 };
 
-export default function Setup({ initial, onStart, onCancel }) {
+export default function Setup({ initial, onStart, onCancel, standalone = false }) {
   const { roster } = useRoster(); // the saved players, edited on the Settings page
   const { members: MEMBERS, canonical, isMember } = roster;
   const [teams, setTeams] = useState(
@@ -62,7 +62,7 @@ export default function Setup({ initial, onStart, onCancel }) {
   return (
     <div className="setup">
       <div className="page-title">
-        <h1>Match setup</h1>
+        <h1>{standalone ? 'Graphic setup' : 'Match setup'}</h1>
         <button className="chip-btn" onClick={split} title="Randomly split all saved players into two teams" disabled={MEMBERS.length < 2}>Shuffle teams</button>
       </div>
 
@@ -131,12 +131,12 @@ export default function Setup({ initial, onStart, onCancel }) {
         </label>
       </section>
 
-      <p className="foot-note">Only dorm members' stats count towards the leaderboards. Guests can play but aren't tracked.</p>
+      <p className="foot-note">{standalone ? 'This match is only for the stream graphic. Nothing is saved to the leaderboards or stats.' : 'Only dorm members\' stats count towards the leaderboards. Guests can play but aren\'t tracked.'}</p>
 
       <div className="setup-actions">
-        <button className="option cut confirm" disabled={!ready} onClick={start}>Start match</button>
+        <button className="option cut confirm" disabled={!ready} onClick={start}>{standalone ? 'Start graphic' : 'Start match'}</button>
         {!ready && <small>Each team needs at least 2 players.</small>}
-        {onCancel && <button className="link-btn" onClick={onCancel}>Back to current match</button>}
+        {onCancel && <button className="link-btn" onClick={onCancel}>{standalone ? 'Back to graphic' : 'Back to current match'}</button>}
       </div>
     </div>
   );

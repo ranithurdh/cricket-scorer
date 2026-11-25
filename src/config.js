@@ -17,3 +17,7 @@ export const DEFAULT_CONFIG = {
     { name: 'Team B', players: [] },
   ],
 };
+
+// The hidden stream-graphic page. Open it at  /scorebug  (or  /#/scorebug).
+// It isn't linked anywhere in the app: change this word to whatever you like to keep it private.
+export const GRAPHIC_PATH = 'scorebug';

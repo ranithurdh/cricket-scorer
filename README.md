@@ -12,6 +12,7 @@
 - `src/Matches.jsx` the Matches page: every saved match with the winning team and its members, each batter's runs (balls) and each bowler's figures
 - `src/Leaderboards.jsx` batting / bowling / fielding leaderboards (default sort: Overall rating)
 - `src/ratings.js` the Overall rating (0-100) equations and the minimum-data thresholds
+- `src/Graphic.jsx`, `Scorebug.jsx`, `graphic.css`, `graphicStats.js`, `useGraphicMatch.js` the hidden stream-graphic page (see *Stream graphic* below)
 - `src/engine.js`  pure scoring logic: `computeState(config, events)`. All stats derive from the event list.
 - `src/useMatch.js` event log + undo/redo + localStorage autosave
 - `src/App.jsx`, `Field.jsx`, `Modals.jsx`  UI
@@ -174,3 +175,13 @@ Set both in `.env` (see `.env.example`). If you don't, the defaults are `admin` 
 - Limits: Vercel accepts ~4.5 MB per request and reply. Uploaded backgrounds are capped at 4 MB, Import backup at 4 MB, and Backup download fails if the file would pass 4.5 MB. If that ever happens, export/import from a local copy (`npm run dev:server` pointed at the same Atlas database).
 - The wrong-password limiter lives in MongoDB (`loginfails`, auto-expiring) so it works across instances.
 - Redeploy by pushing to GitHub. If phones keep an old version, bump `CACHE` in `public/sw.js`.
+
+## Stream graphic (hidden page)
+
+A separate, hidden page for making video overlays. Open **`/scorebug`** (or `/#/scorebug`). It has no tab and no link anywhere in the app; to rename it, change `GRAPHIC_PATH` in `src/config.js`.
+
+- It is its own match: build teams on the setup screen, then score with the same buttons as the Score page (runs, Bye / Leg bye / WD / NB, Out, swap batters, undo / redo, dropped catch, edit match, super over). **Nothing is saved to the database or counted in any stats**, and it never touches a match on the Score page (it uses its own browser storage: `gfx-*` keys).
+- The top of the page is a **16:9 green screen** with the graphic on it; the buttons are underneath. Pickers and dialogs only cover the button area, so the graphic stays visible while you choose a player.
+- **Modes** (buttons under the screen): **Live** (batting team, striker and non-striker with runs (balls), total and wickets, overs, bowler figures, this over; a strip under it appears while chasing), **Target** (NEED x RUNS FROM y BALLS with target, required rate, run rate, wickets in hand; before the chase it shows the projected score, and at the innings break the target), **Batters** (R / B / 4s / 6s / SR and the partnership), **Bowler** (O / R / W / econ / dots and this over), **Summary** (both innings with top batter and bowler, and the result), **Hide** (clean green screen).
+- **Key colour** switches the screen between green, blue and magenta (use blue or magenta if your editor's green key eats part of the graphic). **Pop-ups** turn the FOUR / SIX / WICKET banners on and off. **Frame guide** draws a dashed outline of the 16:9 frame so you know what to crop.
+- Self-hosting works too: `server/index.js` and `vercel.json` send unknown paths to the app, so `/scorebug` opens directly. `npm run test:graphic` checks the numbers the graphic shows.

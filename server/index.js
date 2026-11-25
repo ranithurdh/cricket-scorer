@@ -15,6 +15,7 @@ const dist = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist
 if (fs.existsSync(path.join(dist, 'index.html'))) {
   app.get('/sw.js', (_req, res) => { res.set('Cache-Control', 'no-cache'); res.sendFile(path.join(dist, 'sw.js')); });
   app.use(express.static(dist));
+  app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(dist, 'index.html'))); // lets hidden pages like /scorebug open directly
 }
 
 try {

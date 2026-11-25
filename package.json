@@ -13,7 +13,8 @@
     "test:highlights": "node server/test/highlights.test.js",
     "test:versus": "node server/test/versus.test.js",
     "test:auth": "node server/test/auth.test.js",
-    "test:superover": "node server/test/superover.test.js"
+    "test:superover": "node server/test/superover.test.js",
+    "test:graphic": "node server/test/graphic.test.js"
   },
   "dependencies": {
     "cors": "2.8.5",
