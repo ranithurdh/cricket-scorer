@@ -46,7 +46,7 @@ function Scoring({ config, onNew }) {
   const [flash, setFlash] = useState('');
   const [popup, setPopup] = useState(null);
   const [cards, setCards] = useState({ striker: null, nonStriker: null, bowler: null });
-  const [openProfileIds, setOpenProfileIds] = useState(() => new Set());
+  const [openProfileId, setOpenProfileId] = useState(null);
   const [teamsOpen, setTeamsOpen] = useState(false);
   const [statsList, setStatsList] = useState(null);
   const { roster } = useRoster();
@@ -84,7 +84,7 @@ function Scoring({ config, onNew }) {
     return () => clearTimeout(t);
   }, [popup]);
 
-  // Load career information for the three players currently occupying the live positions.
+  // Keep the three profile controls tied to the players currently occupying each live position.
   // The graphic only reads saved player stats/photos; no match, database or stats records are changed.
   const loadStats = () => {
     if (statsCache.current) return Promise.resolve(statsCache.current);
@@ -102,31 +102,31 @@ function Scoring({ config, onNew }) {
 
   useEffect(() => {
     let cancelled = false;
-    const targets = [
-      { slot: 'striker', playerId: inn.strikerId, kind: 'bat', teamIdx: inn.battingTeam },
-      { slot: 'nonStriker', playerId: inn.nonStrikerId, kind: 'bat', teamIdx: inn.battingTeam },
-      { slot: 'bowler', playerId: inn.bowlerId, kind: 'bowl', teamIdx: inn.bowlingTeam },
-    ];
-    const makeCards = (list) => Object.fromEntries(targets.map(({ slot, playerId, kind, teamIdx }) => {
-      if (!playerId) return [slot, null];
-      const playerName = name(playerId);
-      const entry = roster.find(playerName);
+    const makeCard = (playerId, kind, teamIdx, list) => {
+      if (!playerId) return null;
+      const pname = name(playerId);
+      const entry = roster.find(pname);
       const stats = entry ? (list ?? []).find((p) => nameKey(p.name) === entry.key) ?? null : null;
-      return [slot, {
+      return {
         id: `${kind}-${playerId}-${teamIdx}`,
         playerId,
         kind,
-        name: playerName,
-        team: config.teams[teamIdx]?.name ?? '',
+        name: pname,
+        team: config.teams[teamIdx].name,
         saved: !!entry,
         photo: stats?.photo ?? entry?.photo ?? null,
         stats,
-      }];
-    }));
+      };
+    };
+    const makeCards = (list) => ({
+      striker: makeCard(inn.strikerId, 'bat', inn.battingTeam, list),
+      nonStriker: makeCard(inn.nonStrikerId, 'bat', inn.battingTeam, list),
+      bowler: makeCard(inn.bowlerId, 'bowl', inn.bowlingTeam, list),
+    });
 
-    // Populate the controls immediately, even while career stats are still loading.
+    // Show the current players immediately; career stats/photos fill in when available.
     setCards(makeCards(statsCache.current));
-    if (targets.some((target) => target.playerId) && !statsCache.current) {
+    if ([inn.strikerId, inn.nonStrikerId, inn.bowlerId].some(Boolean) && !statsCache.current) {
       loadStats().then((list) => {
         if (!cancelled && list) setCards(makeCards(list));
       });
@@ -134,31 +134,19 @@ function Scoring({ config, onNew }) {
     return () => { cancelled = true; };
   }, [inn.strikerId, inn.nonStrikerId, inn.bowlerId, inn.battingTeam, inn.bowlingTeam, config, roster]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep a profile open for the same player when the batters cross and swap striker/non-striker ends.
+  // A profile follows its player when the batters swap ends, and closes if that player leaves the crease/attack.
   useEffect(() => {
-    const activeIds = new Set([inn.strikerId, inn.nonStrikerId, inn.bowlerId].filter(Boolean));
-    setOpenProfileIds((current) => {
-      const next = new Set([...current].filter((id) => activeIds.has(id)));
-      return next.size === current.size ? current : next;
-    });
+    const activeIds = [inn.strikerId, inn.nonStrikerId, inn.bowlerId].filter(Boolean);
+    setOpenProfileId((current) => current && activeIds.includes(current) ? current : null);
   }, [inn.strikerId, inn.nonStrikerId, inn.bowlerId]);
 
-  const isOpen = (slot) => !!cards[slot]?.playerId && openProfileIds.has(cards[slot].playerId);
+  const isOpen = (slot) => !!cards[slot]?.playerId && openProfileId === cards[slot].playerId;
   const toggleCard = (slot) => {
     const playerId = cards[slot]?.playerId;
     if (!playerId) return;
-    setOpenProfileIds((current) => {
-      const next = new Set(current);
-      if (next.has(playerId)) next.delete(playerId);
-      else next.add(playerId);
-      return next;
-    });
+    setOpenProfileId((current) => current === playerId ? null : playerId);
   };
-  const visibleProfiles = {
-    striker: isOpen('striker') ? cards.striker : null,
-    nonStriker: isOpen('nonStriker') ? cards.nonStriker : null,
-    bowler: isOpen('bowler') ? cards.bowler : null,
-  };
+  const profile = Object.values(cards).find((card) => card?.playerId === openProfileId) ?? null;
 
   // Teams card: both squads with faces and Bat / Bowl / All-round points. Only reads the saved players' stats.
   const toggleTeams = async () => {
@@ -318,7 +306,7 @@ function Scoring({ config, onNew }) {
     <div className="gfx-page">
       <div className="gfx-band" style={{ '--key': KEYS[keyColour][1] }}>
         <div className={`gfx-stage ${guide ? 'guide' : ''}`}>
-          <Scorebug state={state} mode={mode} popup={popup} profiles={visibleProfiles} teams={teamsOpen ? teamsView : null} />
+          <Scorebug state={state} mode={mode} popup={popup} profile={profile} teams={teamsOpen ? teamsView : null} />
         </div>
       </div>
 
@@ -345,7 +333,7 @@ function Scoring({ config, onNew }) {
                 aria-pressed={isOpen(slot)}
                 disabled={!cards[slot]?.playerId}
                 onClick={() => toggleCard(slot)}
-                title={isOpen(slot) ? 'Hide this profile' : 'Show this profile on the graphic'}
+                title={isOpen(slot) ? 'Hide the profile' : 'Show the profile on the graphic'}
               >
                 <span>{label}</span><small>{cards[slot]?.name ?? 'No player selected'}</small>
               </button>
