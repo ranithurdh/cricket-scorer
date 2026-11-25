@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from 'react';
 import { formatOvers, nameOf } from './engine';
-import PlayerProfile from './Profile';
+import PlayerProfile, { CountUp } from './Profile';
 import { ballToken, bowlerLine, fixed, partnership, plural, strikeRate, summaryView, targetView } from './graphicStats';
 
 // Everything drawn on the green screen. Sizes are in --u (1% of a 16:9 frame), so it scales with the stage.
@@ -178,22 +179,102 @@ function SummaryBody({ state }) {
   );
 }
 
+// Keeps the last value on screen while its exit animation plays, so hiding anything animates too.
+function useLeave(value, ms = 600) {
+  const [held, setHeld] = useState(value);
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    if (value) { setHeld(value); setLeaving(false); return undefined; }
+    if (!held) return undefined;
+    setLeaving(true);
+    const t = setTimeout(() => { setHeld(null); setLeaving(false); }, ms);
+    return () => clearTimeout(t);
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  return [held, leaving];
+}
+
+function ProfileSlot({ profile }) {
+  const [held, leaving] = useLeave(profile);
+  if (!held) return null;
+  return <div className={`gx-prof-wrap ${leaving ? 'out' : ''}`} key={held.id}><PlayerProfile profile={held} /></div>;
+}
+
+// Both squads, centred on the frame: face, name and the Bat / Bowl / All-round points (same ratings as the Home leaderboard).
+const pts = (v) => (v == null ? null : v.toFixed(1));
+const initials = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+
+function Face({ row }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => { setBroken(false); }, [row.photo]);
+  return (
+    <span className="gx-tm-face">
+      {row.photo && !broken ? <img src={row.photo} alt="" draggable={false} onError={() => setBroken(true)} /> : <em>{initials(row.name)}</em>}
+    </span>
+  );
+}
+
+function TeamsSlot({ teams }) {
+  const [held, leaving] = useLeave(teams);
+  if (!held) return null;
+  const most = Math.max(...held.map((t) => t.rows.length), 1);
+  const rh = Math.min(3.2, 36 / most); // rows shrink a little for big squads so everything fits the frame
+  return (
+    <div className={`gx-teams-wrap ${leaving ? 'out' : ''}`}>
+      <div className="gx-teams" style={{ '--rh': `calc(var(--u) * ${rh})` }}>
+        {held.map((t, ti) => (
+          <section key={ti} className="gx-tm" style={{ '--t': ti }}>
+            <div className="gx-tm-shine" />
+            <header className="gx-tm-head"><b>{t.name}</b><small>{t.rows.length} players</small></header>
+            <div className="gx-tm-cols"><span /><span>Player</span><i>Bat</i><i>Bowl</i><i>All</i></div>
+            <div className="gx-tm-rows">
+              {t.rows.map((r, i) => (
+                <div key={r.id} className="gx-tm-row" style={{ '--i': i }}>
+                  <Face row={r} />
+                  <span className="gx-tm-name">{r.name}</span>
+                  <b><CountUp value={pts(r.bat)} delay={400 + i * 60} /></b>
+                  <b><CountUp value={pts(r.bowl)} delay={400 + i * 60} /></b>
+                  <b className="all"><CountUp value={pts(r.all)} delay={400 + i * 60} /></b>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const POP = { four: 'FOUR', six: 'SIX', wicket: 'WICKET' };
 
-export default function Scorebug({ state, mode, popup, profile }) {
-  if (mode === 'hide') return <div className="gx-layer" />;
-  const tv = mode === 'target' ? targetView(state) : null;
-  const solo = mode === 'summary';
-  const body = mode === 'batters' ? <BattersBody state={state} />
-    : mode === 'bowler' ? <BowlerBody state={state} />
-    : mode === 'target' ? <TargetBody v={tv} />
-    : mode === 'summary' ? <SummaryBody state={state} />
+export default function Scorebug({ state, mode, popup, profile, teams }) {
+  const live = mode !== 'hide';
+  const lastMode = useRef(mode);
+  if (live) lastMode.current = mode;
+  const [mounted, setMounted] = useState(live);
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    if (live) { setMounted(true); setLeaving(false); return undefined; }
+    if (!mounted) return undefined;
+    setLeaving(true); // Hide: the strip, card and pop-ups slide away, then are removed
+    const t = setTimeout(() => { setMounted(false); setLeaving(false); }, 600);
+    return () => clearTimeout(t);
+  }, [live]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!mounted && !live) return <div className="gx-layer" />;
+  const shownMode = lastMode.current;
+  const tv = shownMode === 'target' ? targetView(state) : null;
+  const solo = shownMode === 'summary';
+  const body = shownMode === 'batters' ? <BattersBody state={state} />
+    : shownMode === 'bowler' ? <BowlerBody state={state} />
+    : shownMode === 'target' ? <TargetBody v={tv} />
+    : shownMode === 'summary' ? <SummaryBody state={state} />
     : <LiveBody state={state} />;
   return (
     <div className="gx-layer">
-      {profile && <div className="gx-prof-wrap" key={profile.id}><PlayerProfile profile={profile} /></div>}
-      <div className="gx-stack" key={mode}>
-        {popup && (
+      <ProfileSlot profile={live ? profile : null} />
+      <TeamsSlot teams={live ? teams : null} />
+      <div className={`gx-stack ${leaving ? 'leaving' : ''}`} key={shownMode}>
+        {popup && live && (
           <div className={`gx-pop ${popup.kind}`} key={popup.id}>
             <b>{POP[popup.kind]}</b>{popup.sub && <small>{popup.sub}</small>}
           </div>

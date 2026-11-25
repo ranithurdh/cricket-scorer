@@ -20,6 +20,8 @@
 @supports (width: 1cqw) { .gx-layer { --u: min(1cqw, 1.7778cqh); } }
 
 .gx-stack { position: relative; width: 100%; animation: gx-in 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes gx-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(calc(var(--u) * 2.5)); } }
+.gx-stack.leaving { animation: gx-out 0.5s cubic-bezier(0.5, 0, 0.8, 0.4) both; }
 @keyframes gx-in { from { opacity: 0; transform: translateY(calc(var(--u) * 2)); } to { opacity: 1; transform: none; } }
 
 .gx-card { overflow: hidden; background: var(--ivory); border-top: calc(var(--u) * 0.15) solid var(--lime); border-bottom: calc(var(--u) * 0.15) solid var(--lime); }
@@ -84,6 +86,7 @@
 .gx-tile.hot b { color: var(--forest); }
 
 /* Bowler */
+.gx-body.bowl .gx-tile small { color: var(--moss); } /* same label colour as the batters' stat line */
 .gx-body.bowl .gx-balls { margin-left: auto; }
 
 /* Target */
@@ -143,13 +146,10 @@
 
 /* ---------- the player card (new batter / new bowler) ---------- */
 /* sits above the strip on the left, small enough that most of the green screen stays clear */
-.gx-prof-wrap { position: absolute; left: calc(var(--u) * 2.4); bottom: calc(var(--u) * 9.4); animation: gx-prof-life 6.4s linear both; }
-@keyframes gx-prof-life {
-  0% { opacity: 0; transform: translateX(calc(var(--u) * -3)); }
-  5% { opacity: 1; transform: none; }
-  92% { opacity: 1; transform: none; }
-  100% { opacity: 0; transform: translateX(calc(var(--u) * -3)); }
-}
+.gx-prof-wrap { position: absolute; left: calc(var(--u) * 2.4); bottom: calc(var(--u) * 9.4); animation: gx-prof-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.gx-prof-wrap.out { animation: gx-prof-out 0.55s cubic-bezier(0.5, 0, 0.8, 0.4) both; }
+@keyframes gx-prof-in { from { opacity: 0; transform: translateX(calc(var(--u) * -3)); } to { opacity: 1; transform: none; } }
+@keyframes gx-prof-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(calc(var(--u) * -6)); } }
 .gx-prof { position: relative; width: calc(var(--u) * 26); overflow: hidden; border-radius: calc(var(--u) * 0.9); background: linear-gradient(160deg, var(--hunter) 0%, var(--forest) 70%); border: calc(var(--u) * 0.15) solid var(--lime); box-shadow: 0 calc(var(--u) * 0.6) calc(var(--u) * 2) #0006; animation: gx-wipe 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .gx-prof.has-photo { width: calc(var(--u) * 32); }
 .gx-prof-shine { position: absolute; inset: 0; z-index: 3; pointer-events: none; background: linear-gradient(105deg, transparent 35%, #ffffff55 50%, transparent 65%); transform: translateX(-120%); animation: gx-shine 1.1s ease-out 0.9s both; }
@@ -179,9 +179,34 @@
 .gx-prof-name b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--display); font-weight: 400; font-size: calc(var(--u) * 2.6); line-height: 1.1; text-transform: uppercase; animation: gx-letters 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.4s both; }
 @keyframes gx-letters { from { letter-spacing: 0.3em; opacity: 0; } to { letter-spacing: 0.04em; opacity: 1; } }
 
+
+/* ---------- both squads, centred on the frame ---------- */
+.gx-teams-wrap { position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center; animation: gx-teams-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.gx-teams-wrap.out { animation: gx-teams-out 0.55s cubic-bezier(0.5, 0, 0.8, 0.4) both; }
+@keyframes gx-teams-in { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes gx-teams-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.94); } }
+.gx-teams { display: flex; align-items: flex-start; justify-content: center; gap: calc(var(--u) * 2); }
+.gx-tm { position: relative; width: calc(var(--u) * 37); overflow: hidden; border-radius: calc(var(--u) * 0.9); background: linear-gradient(160deg, var(--hunter) 0%, var(--forest) 70%); border: calc(var(--u) * 0.15) solid var(--lime); box-shadow: 0 calc(var(--u) * 0.6) calc(var(--u) * 2) #0006; animation: gx-tm-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) calc(var(--t) * 0.15s) both; }
+@keyframes gx-tm-in { from { opacity: 0; transform: translateX(calc(var(--u) * (var(--t) * 2 - 1) * -6)); } to { opacity: 1; transform: none; } }
+.gx-tm-shine { position: absolute; inset: 0; z-index: 3; pointer-events: none; background: linear-gradient(105deg, transparent 35%, #ffffff55 50%, transparent 65%); transform: translateX(-120%); animation: gx-shine 1.1s ease-out 0.9s both; }
+.gx-tm-head { display: flex; align-items: baseline; justify-content: space-between; gap: calc(var(--u) * 1); padding: calc(var(--u) * 0.7) calc(var(--u) * 2.4) calc(var(--u) * 0.7) calc(var(--u) * 1.4); background: var(--ivory); color: var(--forest); clip-path: polygon(0 0, 100% 0, calc(100% - var(--u) * 1.4) 100%, 0 100%); }
+.gx-tm-head b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--display); font-weight: 400; font-size: calc(var(--u) * 2.3); letter-spacing: 0.08em; text-transform: uppercase; }
+.gx-tm-head small { flex: none; font-size: calc(var(--u) * 1); letter-spacing: 0.1em; text-transform: uppercase; color: var(--moss); }
+.gx-tm-cols, .gx-tm-row { display: grid; grid-template-columns: calc(var(--rh, var(--u) * 3) - var(--u) * 0.3) 1fr calc(var(--u) * 5.2) calc(var(--u) * 5.2) calc(var(--u) * 5.6); gap: calc(var(--u) * 0.4); align-items: center; }
+.gx-tm-cols { padding: calc(var(--u) * 0.7) calc(var(--u) * 1) calc(var(--u) * 0.2); color: var(--lime); font-size: calc(var(--u) * 0.9); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.gx-tm-cols i { font-style: normal; text-align: center; }
+.gx-tm-rows { display: flex; flex-direction: column; gap: calc(var(--u) * 0.3); padding: 0 calc(var(--u) * 1) calc(var(--u) * 1); }
+.gx-tm-row { height: var(--rh); animation: gx-row-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) calc(0.35s + var(--i) * 0.06s) both; }
+.gx-tm-face { position: relative; width: 100%; height: 100%; aspect-ratio: 1; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, var(--lime), var(--sage)); border: calc(var(--u) * 0.1) solid var(--ivory); }
+.gx-tm-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gx-tm-face em { font-style: normal; font-family: var(--display); font-size: calc(var(--rh) * 0.42); color: var(--forest); letter-spacing: 0.04em; }
+.gx-tm-name { height: 100%; display: flex; align-items: center; min-width: 0; padding-left: calc(var(--u) * 0.9); background: linear-gradient(90deg, var(--sage), var(--moss)); color: var(--cream); font-size: calc(var(--u) * 1.15); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; clip-path: polygon(0 0, 100% 0, calc(100% - var(--u) * 0.5) 100%, 0 100%); }
+.gx-tm-row b { height: 100%; display: flex; align-items: center; justify-content: center; background: var(--ivory); color: var(--forest); font-family: var(--display); font-weight: 400; font-size: calc(var(--u) * 1.5); letter-spacing: 0.03em; clip-path: polygon(calc(var(--u) * 0.4) 0, 100% 0, calc(100% - var(--u) * 0.4) 100%, 0 100%); }
+.gx-tm-row b.all { background: var(--lime); }
+
 @media (prefers-reduced-motion: reduce) {
   .gx-stack, .gx-pop, .gx-card, .gx-team, .gx-body > *, .gx-tok, .gx-score, .gx-tile, .gx-bcell,
-  .gx-prof-wrap, .gx-prof, .gx-prof *, .gx-prof-shine { animation: none !important; }
+  .gx-prof-wrap, .gx-prof, .gx-prof *, .gx-prof-shine, .gx-stack.leaving, .gx-teams-wrap, .gx-tm, .gx-tm *, .gx-tm-shine { animation: none !important; }
 }
 
 /* ---------- controls under the screen ---------- */
@@ -196,6 +221,13 @@
 .gfx-foot { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .chip-btn[aria-pressed='true'] { background: var(--hunter); color: var(--cream); box-shadow: none; }
 @media (max-width: 400px) { .gfx-util .btn.side { font-size: 12px; } .gfx-util .btn.side small { font-size: 10px; } }
+
+/* profile buttons: appear once a new batter / bowler has been picked; tap to show the card, tap again to hide it */
+.gfx-profs { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 5px; }
+.btn.gfx-prof-btn { min-height: 46px; padding: 4px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1.1; }
+.btn.gfx-prof-btn span { font-family: var(--display); font-size: 16px; letter-spacing: 0.08em; text-transform: uppercase; }
+.btn.gfx-prof-btn small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; opacity: 0.85; }
+.btn.gfx-prof-btn.on { background: var(--hunter); color: var(--cream); box-shadow: none; }
 
 /* pickers and dialogs cover only the controls, so the graphic stays visible while you choose a player */
 .gfx-controls .overlay { z-index: 5; }

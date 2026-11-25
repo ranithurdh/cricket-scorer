@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_CONFIG } from './config';
 import Setup from './Setup';
 import EditMatch from './EditMatch';
@@ -8,6 +8,7 @@ import { RosterContext, useRosterState, useRoster } from './roster';
 import { fetchPlayerStats } from './api';
 import { players, nameOf, formatOvers } from './engine';
 import { nameKey } from './members';
+import { overallRatings } from './ratings';
 import { useGraphicMatch, GFX_CONFIG_KEY, GFX_EVENTS_KEY } from './useGraphicMatch';
 import './graphic.css';
 
@@ -19,7 +20,6 @@ const TITLE = { striker: 'Select striker', nonStriker: 'Select non-striker', bow
 const MODES = [['live', 'Live'], ['target', 'Target'], ['batters', 'Batters'], ['bowler', 'Bowler'], ['summary', 'Summary'], ['hide', 'Hide']];
 const KEYS = { green: ['Green', '#00b140'], blue: ['Blue', '#0047bb'], magenta: ['Magenta', '#ff00ff'] };
 const POP_MS = 3300;
-const PROFILE_MS = 6400; // how long the player card stays up
 
 // A setting kept in this browser (so a refresh doesn't switch the mode back or change the key colour).
 function usePersisted(key, initial, valid) {
@@ -45,8 +45,11 @@ function Scoring({ config, onNew }) {
   const [editor, setEditor] = useState(false);
   const [flash, setFlash] = useState('');
   const [popup, setPopup] = useState(null);
-  const [profile, setProfile] = useState(null);
+  const [cards, setCards] = useState({ bat: null, bowl: null }); // latest new batter / bowler card, waiting for a tap
+  const [open, setOpen] = useState(null); // which card is on the graphic: 'bat' | 'bowl' | null
   const [profilesOn, setProfilesOn] = usePersisted('gfx-profiles-v1', true);
+  const [teamsOpen, setTeamsOpen] = useState(false);
+  const [statsList, setStatsList] = useState(null);
   const { roster } = useRoster();
   const statsCache = useRef(null);
   const profileSeq = useRef(0);
@@ -97,20 +100,44 @@ function Scoring({ config, onNew }) {
     } catch { /* offline: use the last copy, or show the card without numbers */ }
     if (id !== profileSeq.current) return; // something newer happened while the stats were loading
     const stats = entry ? (list ?? []).find((p) => nameKey(p.name) === entry.key) ?? null : null;
-    setProfile({ id: Date.now(), kind, name: pname, team: config.teams[teamIdx].name, saved: !!entry, photo: stats?.photo ?? entry?.photo ?? null, stats });
+    setCards((c) => ({ ...c, [kind]: { id: Date.now(), kind, name: pname, team: config.teams[teamIdx].name, saved: !!entry, photo: stats?.photo ?? entry?.photo ?? null, stats } }));
+    setOpen((o) => (o === kind ? null : o)); // a newer player replaces the old card; wait for a tap to show it
   };
   const prevEvLen = useRef(events.length);
   useEffect(() => {
     const len = events.length, last = events[len - 1];
     if (len === prevEvLen.current + 1 && last?.type === 'select' && profilesOn) showProfile(last);
-    else if (len < prevEvLen.current) { profileSeq.current += 1; setProfile(null); }
+    else if (len < prevEvLen.current) { profileSeq.current += 1; setCards({ bat: null, bowl: null }); setOpen(null); }
     prevEvLen.current = len;
   }, [events]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!profile) return undefined;
-    const t = setTimeout(() => setProfile(null), PROFILE_MS);
-    return () => clearTimeout(t);
-  }, [profile]);
+  const toggleCard = (kind) => setOpen((o) => (o === kind ? null : kind)); // tap once to show, again to take it off
+  const profile = open ? cards[open] : null;
+
+  // Teams card: both squads with faces and Bat / Bowl / All-round points. Only reads the saved players' stats.
+  const toggleTeams = async () => {
+    if (teamsOpen) { setTeamsOpen(false); return; }
+    setTeamsOpen(true);
+    if (statsCache.current) setStatsList(statsCache.current);
+    try {
+      const list = await Promise.race([fetchPlayerStats(), new Promise((_, no) => setTimeout(no, 4000))]);
+      statsCache.current = list;
+      setStatsList(list);
+    } catch { /* offline: faces and names still show, points stay blank */ }
+  };
+  const teamsView = useMemo(() => {
+    const list = statsList ?? [];
+    const bat = overallRatings(list, 'batting', (p) => p.batting.innings > 0).map;
+    const bowl = overallRatings(list, 'bowling', (p) => p.bowling.balls > 0).map;
+    return config.teams.map((t) => ({
+      name: t.name,
+      rows: t.players.map((p) => {
+        const entry = roster.find(p.name);
+        const st = entry ? list.find((x) => nameKey(x.name) === entry.key) ?? null : null;
+        const b = st ? bat.get(st.name)?.score ?? null : null, w = st ? bowl.get(st.name)?.score ?? null : null;
+        return { id: p.id, name: p.name, photo: st?.photo ?? entry?.photo ?? null, bat: b, bowl: w, all: b != null && w != null ? (b + w) / 2 : null };
+      }),
+    }));
+  }, [config, roster, statsList]);
 
   const commit = (ball) => { dispatch(ball); setMods({ extra: null, out: false }); setModal(null); };
   const onRun = (runs) => {
@@ -244,7 +271,7 @@ function Scoring({ config, onNew }) {
     <div className="gfx-page">
       <div className="gfx-band" style={{ '--key': KEYS[keyColour][1] }}>
         <div className={`gfx-stage ${guide ? 'guide' : ''}`}>
-          <Scorebug state={state} mode={mode} popup={popup} profile={profilesOn ? profile : null} />
+          <Scorebug state={state} mode={mode} popup={popup} profile={profilesOn ? profile : null} teams={teamsOpen ? teamsView : null} />
         </div>
       </div>
 
@@ -253,6 +280,17 @@ function Scoring({ config, onNew }) {
           <div className="gfx-modes" role="group" aria-label="Graphic mode">
             {MODES.map(([k, label]) => (
               <button key={k} aria-pressed={mode === k} className={`btn cut gfx-mode ${mode === k ? 'on' : ''}`} onClick={() => setMode(k)}>{label}</button>
+            ))}
+          </div>
+
+          <div className="gfx-profs" role="group" aria-label="Teams and player profiles">
+            <button className={`btn cut gfx-prof-btn ${teamsOpen ? 'on' : ''}`} aria-pressed={teamsOpen} onClick={toggleTeams} title={teamsOpen ? 'Hide the teams' : 'Show both teams with their points'}>
+              <span>Teams</span><small>Squads &amp; points</small>
+            </button>
+            {profilesOn && [['bat', 'Batter profile'], ['bowl', 'Bowler profile']].map(([k, label]) => cards[k] && (
+              <button key={k} className={`btn cut gfx-prof-btn ${open === k ? 'on' : ''}`} aria-pressed={open === k} onClick={() => toggleCard(k)} title={open === k ? 'Hide the profile' : 'Show the profile on the graphic'}>
+                <span>{label}</span><small>{cards[k].name}</small>
+              </button>
             ))}
           </div>
 

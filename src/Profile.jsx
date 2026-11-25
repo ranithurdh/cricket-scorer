@@ -23,7 +23,7 @@ function rowsFor(profile) {
 }
 
 // Counts up from 0 to the value (numbers only; "27/39" and "-" are shown as they are).
-function CountUp({ value, delay }) {
+export function CountUp({ value, delay }) {
   const text = value ?? '-';
   const target = Number(text);
   const numeric = value !== null && value !== undefined && Number.isFinite(target) && /^-?\d+(\.\d+)?$/.test(text);
