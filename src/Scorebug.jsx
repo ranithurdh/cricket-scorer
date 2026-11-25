@@ -196,7 +196,16 @@ function useLeave(value, ms = 600) {
 function ProfileSlot({ profile }) {
   const [held, leaving] = useLeave(profile);
   if (!held) return null;
-  return <div className={`gx-prof-wrap ${leaving ? 'out' : ''}`} key={held.id}><PlayerProfile profile={held} /></div>;
+  return <div className={`gx-prof-wrap ${leaving ? 'out' : ''}`}><PlayerProfile profile={held} /></div>;
+}
+
+function ProfilesSlot({ profiles }) {
+  const slots = ['striker', 'nonStriker', 'bowler'];
+  return (
+    <div className="gx-profiles-wrap">
+      {slots.map((slot) => <ProfileSlot key={slot} profile={profiles?.[slot] ?? null} />)}
+    </div>
+  );
 }
 
 // Both squads, centred on the frame: face, name and the Bat / Bowl / All-round points (same ratings as the Home leaderboard).
@@ -246,7 +255,7 @@ function TeamsSlot({ teams }) {
 
 const POP = { four: 'FOUR', six: 'SIX', wicket: 'WICKET' };
 
-export default function Scorebug({ state, mode, popup, profile, teams }) {
+export default function Scorebug({ state, mode, popup, profiles, teams }) {
   const live = mode !== 'hide';
   const lastMode = useRef(mode);
   if (live) lastMode.current = mode;
@@ -271,7 +280,7 @@ export default function Scorebug({ state, mode, popup, profile, teams }) {
     : <LiveBody state={state} />;
   return (
     <div className="gx-layer">
-      <ProfileSlot profile={live ? profile : null} />
+      <ProfilesSlot profiles={live ? profiles : null} />
       <TeamsSlot teams={live ? teams : null} />
       <div className={`gx-stack ${leaving ? 'leaving' : ''}`} key={shownMode}>
         {popup && live && (

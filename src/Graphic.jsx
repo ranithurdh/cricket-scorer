@@ -45,14 +45,13 @@ function Scoring({ config, onNew }) {
   const [editor, setEditor] = useState(false);
   const [flash, setFlash] = useState('');
   const [popup, setPopup] = useState(null);
-  const [cards, setCards] = useState({ bat: null, bowl: null }); // latest new batter / bowler card, waiting for a tap
-  const [open, setOpen] = useState(null); // which card is on the graphic: 'bat' | 'bowl' | null
-  const [profilesOn, setProfilesOn] = usePersisted('gfx-profiles-v1', true);
+  const [cards, setCards] = useState({ striker: null, nonStriker: null, bowler: null });
+  const [openProfileIds, setOpenProfileIds] = useState(() => new Set());
   const [teamsOpen, setTeamsOpen] = useState(false);
   const [statsList, setStatsList] = useState(null);
   const { roster } = useRoster();
   const statsCache = useRef(null);
-  const profileSeq = useRef(0);
+  const statsPromise = useRef(null);
 
   const inn = state.current;
   const bpo = config.ballsPerOver;
@@ -85,33 +84,81 @@ function Scoring({ config, onNew }) {
     return () => clearTimeout(t);
   }, [popup]);
 
-  // Player card: appears when a new batter or bowler is picked (not on undo, redo or when the match is edited).
-  // It only READS the saved players' career stats and faces from the database; nothing is written.
-  const showProfile = async (ev) => {
-    const id = ++profileSeq.current;
-    const kind = ev.role === 'bowler' ? 'bowl' : 'bat';
-    const teamIdx = kind === 'bowl' ? inn.bowlingTeam : inn.battingTeam;
-    const pname = name(ev.playerId);
-    const entry = roster.find(pname);
-    let list = statsCache.current;
-    try {
-      list = await Promise.race([fetchPlayerStats(), new Promise((_, no) => setTimeout(no, 1500))]);
-      statsCache.current = list;
-    } catch { /* offline: use the last copy, or show the card without numbers */ }
-    if (id !== profileSeq.current) return; // something newer happened while the stats were loading
-    const stats = entry ? (list ?? []).find((p) => nameKey(p.name) === entry.key) ?? null : null;
-    setCards((c) => ({ ...c, [kind]: { id: Date.now(), kind, name: pname, team: config.teams[teamIdx].name, saved: !!entry, photo: stats?.photo ?? entry?.photo ?? null, stats } }));
-    setOpen((o) => (o === kind ? null : o)); // a newer player replaces the old card; wait for a tap to show it
+  // Load career information for the three players currently occupying the live positions.
+  // The graphic only reads saved player stats/photos; no match, database or stats records are changed.
+  const loadStats = () => {
+    if (statsCache.current) return Promise.resolve(statsCache.current);
+    if (!statsPromise.current) {
+      statsPromise.current = Promise.race([
+        fetchPlayerStats(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Player stats timed out')), 1500)),
+      ]).then((list) => {
+        statsCache.current = list;
+        return list;
+      }).catch(() => null).finally(() => { statsPromise.current = null; });
+    }
+    return statsPromise.current;
   };
-  const prevEvLen = useRef(events.length);
+
   useEffect(() => {
-    const len = events.length, last = events[len - 1];
-    if (len === prevEvLen.current + 1 && last?.type === 'select' && profilesOn) showProfile(last);
-    else if (len < prevEvLen.current) { profileSeq.current += 1; setCards({ bat: null, bowl: null }); setOpen(null); }
-    prevEvLen.current = len;
-  }, [events]); // eslint-disable-line react-hooks/exhaustive-deps
-  const toggleCard = (kind) => setOpen((o) => (o === kind ? null : kind)); // tap once to show, again to take it off
-  const profile = open ? cards[open] : null;
+    let cancelled = false;
+    const targets = [
+      { slot: 'striker', playerId: inn.strikerId, kind: 'bat', teamIdx: inn.battingTeam },
+      { slot: 'nonStriker', playerId: inn.nonStrikerId, kind: 'bat', teamIdx: inn.battingTeam },
+      { slot: 'bowler', playerId: inn.bowlerId, kind: 'bowl', teamIdx: inn.bowlingTeam },
+    ];
+    const makeCards = (list) => Object.fromEntries(targets.map(({ slot, playerId, kind, teamIdx }) => {
+      if (!playerId) return [slot, null];
+      const playerName = name(playerId);
+      const entry = roster.find(playerName);
+      const stats = entry ? (list ?? []).find((p) => nameKey(p.name) === entry.key) ?? null : null;
+      return [slot, {
+        id: `${kind}-${playerId}-${teamIdx}`,
+        playerId,
+        kind,
+        name: playerName,
+        team: config.teams[teamIdx]?.name ?? '',
+        saved: !!entry,
+        photo: stats?.photo ?? entry?.photo ?? null,
+        stats,
+      }];
+    }));
+
+    // Populate the controls immediately, even while career stats are still loading.
+    setCards(makeCards(statsCache.current));
+    if (targets.some((target) => target.playerId) && !statsCache.current) {
+      loadStats().then((list) => {
+        if (!cancelled && list) setCards(makeCards(list));
+      });
+    }
+    return () => { cancelled = true; };
+  }, [inn.strikerId, inn.nonStrikerId, inn.bowlerId, inn.battingTeam, inn.bowlingTeam, config, roster]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep a profile open for the same player when the batters cross and swap striker/non-striker ends.
+  useEffect(() => {
+    const activeIds = new Set([inn.strikerId, inn.nonStrikerId, inn.bowlerId].filter(Boolean));
+    setOpenProfileIds((current) => {
+      const next = new Set([...current].filter((id) => activeIds.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [inn.strikerId, inn.nonStrikerId, inn.bowlerId]);
+
+  const isOpen = (slot) => !!cards[slot]?.playerId && openProfileIds.has(cards[slot].playerId);
+  const toggleCard = (slot) => {
+    const playerId = cards[slot]?.playerId;
+    if (!playerId) return;
+    setOpenProfileIds((current) => {
+      const next = new Set(current);
+      if (next.has(playerId)) next.delete(playerId);
+      else next.add(playerId);
+      return next;
+    });
+  };
+  const visibleProfiles = {
+    striker: isOpen('striker') ? cards.striker : null,
+    nonStriker: isOpen('nonStriker') ? cards.nonStriker : null,
+    bowler: isOpen('bowler') ? cards.bowler : null,
+  };
 
   // Teams card: both squads with faces and Bat / Bowl / All-round points. Only reads the saved players' stats.
   const toggleTeams = async () => {
@@ -271,7 +318,7 @@ function Scoring({ config, onNew }) {
     <div className="gfx-page">
       <div className="gfx-band" style={{ '--key': KEYS[keyColour][1] }}>
         <div className={`gfx-stage ${guide ? 'guide' : ''}`}>
-          <Scorebug state={state} mode={mode} popup={popup} profile={profilesOn ? profile : null} teams={teamsOpen ? teamsView : null} />
+          <Scorebug state={state} mode={mode} popup={popup} profiles={visibleProfiles} teams={teamsOpen ? teamsView : null} />
         </div>
       </div>
 
@@ -287,9 +334,20 @@ function Scoring({ config, onNew }) {
             <button className={`btn cut gfx-prof-btn ${teamsOpen ? 'on' : ''}`} aria-pressed={teamsOpen} onClick={toggleTeams} title={teamsOpen ? 'Hide the teams' : 'Show both teams with their points'}>
               <span>Teams</span><small>Squads &amp; points</small>
             </button>
-            {profilesOn && [['bat', 'Batter profile'], ['bowl', 'Bowler profile']].map(([k, label]) => cards[k] && (
-              <button key={k} className={`btn cut gfx-prof-btn ${open === k ? 'on' : ''}`} aria-pressed={open === k} onClick={() => toggleCard(k)} title={open === k ? 'Hide the profile' : 'Show the profile on the graphic'}>
-                <span>{label}</span><small>{cards[k].name}</small>
+            {[
+              ['striker', 'Striker'],
+              ['nonStriker', 'Non-striker'],
+              ['bowler', 'Bowler'],
+            ].map(([slot, label]) => (
+              <button
+                key={slot}
+                className={`btn cut gfx-prof-btn ${isOpen(slot) ? 'on' : ''}`}
+                aria-pressed={isOpen(slot)}
+                disabled={!cards[slot]?.playerId}
+                onClick={() => toggleCard(slot)}
+                title={isOpen(slot) ? 'Hide this profile' : 'Show this profile on the graphic'}
+              >
+                <span>{label}</span><small>{cards[slot]?.name ?? 'No player selected'}</small>
               </button>
             ))}
           </div>
@@ -326,7 +384,6 @@ function Scoring({ config, onNew }) {
           <div className="gfx-foot">
             <button className="chip-btn" onClick={nextKey} title="Change the screen colour to key out">Key colour: {KEYS[keyColour][0]}</button>
             <button className="chip-btn" aria-pressed={popsOn} onClick={() => setPopsOn((v) => !v)} title="Show FOUR / SIX / WICKET banners">Pop-ups: {popsOn ? 'On' : 'Off'}</button>
-            <button className="chip-btn" aria-pressed={profilesOn} onClick={() => setProfilesOn((v) => !v)} title="Show a player card when a new batter or bowler is picked">Profiles: {profilesOn ? 'On' : 'Off'}</button>
             <button className="chip-btn" aria-pressed={guide} onClick={() => setGuide((v) => !v)} title="Dashed outline of the 16:9 frame">Frame guide: {guide ? 'On' : 'Off'}</button>
             <button className="chip-btn" onClick={onNew}>New match</button>
           </div>

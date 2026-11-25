@@ -148,6 +148,9 @@
 /* sits above the strip on the left, small enough that most of the green screen stays clear */
 .gx-prof-wrap { position: absolute; left: calc(var(--u) * 2.4); bottom: calc(var(--u) * 9.4); animation: gx-prof-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .gx-prof-wrap.out { animation: gx-prof-out 0.55s cubic-bezier(0.5, 0, 0.8, 0.4) both; }
+.gx-profiles-wrap { position: absolute; left: calc(var(--u) * 2.4); bottom: calc(var(--u) * 9.4); z-index: 3; display: flex; align-items: flex-end; gap: calc(var(--u) * 0.8); max-width: calc(var(--u) * 96); }
+.gx-prof-wrap { position: relative; left: auto; bottom: auto; flex: 0 1 calc(var(--u) * 30); min-width: 0; }
+.gx-prof-wrap .gx-prof, .gx-prof-wrap .gx-prof.has-photo { width: 100%; }
 @keyframes gx-prof-in { from { opacity: 0; transform: translateX(calc(var(--u) * -3)); } to { opacity: 1; transform: none; } }
 @keyframes gx-prof-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(calc(var(--u) * -6)); } }
 .gx-prof { position: relative; width: calc(var(--u) * 26); overflow: hidden; border-radius: calc(var(--u) * 0.9); background: linear-gradient(160deg, var(--hunter) 0%, var(--forest) 70%); border: calc(var(--u) * 0.15) solid var(--lime); box-shadow: 0 calc(var(--u) * 0.6) calc(var(--u) * 2) #0006; animation: gx-wipe 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
@@ -206,7 +209,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .gx-stack, .gx-pop, .gx-card, .gx-team, .gx-body > *, .gx-tok, .gx-score, .gx-tile, .gx-bcell,
-  .gx-prof-wrap, .gx-prof, .gx-prof *, .gx-prof-shine, .gx-stack.leaving, .gx-teams-wrap, .gx-tm, .gx-tm *, .gx-tm-shine { animation: none !important; }
+  .gx-prof-wrap, .gx-prof, .gx-prof *, .gx-prof-shine, .gx-profiles-wrap, .gx-stack.leaving, .gx-teams-wrap, .gx-tm, .gx-tm *, .gx-tm-shine { animation: none !important; }
 }
 
 /* ---------- controls under the screen ---------- */
@@ -222,8 +225,9 @@
 .chip-btn[aria-pressed='true'] { background: var(--hunter); color: var(--cream); box-shadow: none; }
 @media (max-width: 400px) { .gfx-util .btn.side { font-size: 12px; } .gfx-util .btn.side small { font-size: 10px; } }
 
-/* profile buttons: appear once a new batter / bowler has been picked; tap to show the card, tap again to hide it */
-.gfx-profs { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 5px; }
+/* three permanent profile controls: striker, non-striker and bowler; each toggles independently */
+.gfx-profs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.gfx-profs > .gfx-prof-btn:first-child { grid-column: 1 / -1; }
 .btn.gfx-prof-btn { min-height: 46px; padding: 4px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1.1; }
 .btn.gfx-prof-btn span { font-family: var(--display); font-size: 16px; letter-spacing: 0.08em; text-transform: uppercase; }
 .btn.gfx-prof-btn small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; opacity: 0.85; }
