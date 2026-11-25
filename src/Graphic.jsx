@@ -4,8 +4,10 @@ import Setup from './Setup';
 import EditMatch from './EditMatch';
 import Scorebug from './Scorebug';
 import { Overlay, Picker, DismissalModal } from './Modals';
-import { RosterContext, useRosterState } from './roster';
+import { RosterContext, useRosterState, useRoster } from './roster';
+import { fetchPlayerStats } from './api';
 import { players, nameOf, formatOvers } from './engine';
+import { nameKey } from './members';
 import { useGraphicMatch, GFX_CONFIG_KEY, GFX_EVENTS_KEY } from './useGraphicMatch';
 import './graphic.css';
 
@@ -17,6 +19,7 @@ const TITLE = { striker: 'Select striker', nonStriker: 'Select non-striker', bow
 const MODES = [['live', 'Live'], ['target', 'Target'], ['batters', 'Batters'], ['bowler', 'Bowler'], ['summary', 'Summary'], ['hide', 'Hide']];
 const KEYS = { green: ['Green', '#00b140'], blue: ['Blue', '#0047bb'], magenta: ['Magenta', '#ff00ff'] };
 const POP_MS = 3300;
+const PROFILE_MS = 6400; // how long the player card stays up
 
 // A setting kept in this browser (so a refresh doesn't switch the mode back or change the key colour).
 function usePersisted(key, initial, valid) {
@@ -42,6 +45,11 @@ function Scoring({ config, onNew }) {
   const [editor, setEditor] = useState(false);
   const [flash, setFlash] = useState('');
   const [popup, setPopup] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [profilesOn, setProfilesOn] = usePersisted('gfx-profiles-v1', true);
+  const { roster } = useRoster();
+  const statsCache = useRef(null);
+  const profileSeq = useRef(0);
 
   const inn = state.current;
   const bpo = config.ballsPerOver;
@@ -73,6 +81,36 @@ function Scoring({ config, onNew }) {
     const t = setTimeout(() => setPopup(null), POP_MS);
     return () => clearTimeout(t);
   }, [popup]);
+
+  // Player card: appears when a new batter or bowler is picked (not on undo, redo or when the match is edited).
+  // It only READS the saved players' career stats and faces from the database; nothing is written.
+  const showProfile = async (ev) => {
+    const id = ++profileSeq.current;
+    const kind = ev.role === 'bowler' ? 'bowl' : 'bat';
+    const teamIdx = kind === 'bowl' ? inn.bowlingTeam : inn.battingTeam;
+    const pname = name(ev.playerId);
+    const entry = roster.find(pname);
+    let list = statsCache.current;
+    try {
+      list = await Promise.race([fetchPlayerStats(), new Promise((_, no) => setTimeout(no, 1500))]);
+      statsCache.current = list;
+    } catch { /* offline: use the last copy, or show the card without numbers */ }
+    if (id !== profileSeq.current) return; // something newer happened while the stats were loading
+    const stats = entry ? (list ?? []).find((p) => nameKey(p.name) === entry.key) ?? null : null;
+    setProfile({ id: Date.now(), kind, name: pname, team: config.teams[teamIdx].name, saved: !!entry, photo: stats?.photo ?? entry?.photo ?? null, stats });
+  };
+  const prevEvLen = useRef(events.length);
+  useEffect(() => {
+    const len = events.length, last = events[len - 1];
+    if (len === prevEvLen.current + 1 && last?.type === 'select' && profilesOn) showProfile(last);
+    else if (len < prevEvLen.current) { profileSeq.current += 1; setProfile(null); }
+    prevEvLen.current = len;
+  }, [events]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!profile) return undefined;
+    const t = setTimeout(() => setProfile(null), PROFILE_MS);
+    return () => clearTimeout(t);
+  }, [profile]);
 
   const commit = (ball) => { dispatch(ball); setMods({ extra: null, out: false }); setModal(null); };
   const onRun = (runs) => {
@@ -206,7 +244,7 @@ function Scoring({ config, onNew }) {
     <div className="gfx-page">
       <div className="gfx-band" style={{ '--key': KEYS[keyColour][1] }}>
         <div className={`gfx-stage ${guide ? 'guide' : ''}`}>
-          <Scorebug state={state} mode={mode} popup={popup} />
+          <Scorebug state={state} mode={mode} popup={popup} profile={profilesOn ? profile : null} />
         </div>
       </div>
 
@@ -250,6 +288,7 @@ function Scoring({ config, onNew }) {
           <div className="gfx-foot">
             <button className="chip-btn" onClick={nextKey} title="Change the screen colour to key out">Key colour: {KEYS[keyColour][0]}</button>
             <button className="chip-btn" aria-pressed={popsOn} onClick={() => setPopsOn((v) => !v)} title="Show FOUR / SIX / WICKET banners">Pop-ups: {popsOn ? 'On' : 'Off'}</button>
+            <button className="chip-btn" aria-pressed={profilesOn} onClick={() => setProfilesOn((v) => !v)} title="Show a player card when a new batter or bowler is picked">Profiles: {profilesOn ? 'On' : 'Off'}</button>
             <button className="chip-btn" aria-pressed={guide} onClick={() => setGuide((v) => !v)} title="Dashed outline of the 16:9 frame">Frame guide: {guide ? 'On' : 'Off'}</button>
             <button className="chip-btn" onClick={onNew}>New match</button>
           </div>

@@ -1,4 +1,5 @@
 import { formatOvers, nameOf } from './engine';
+import PlayerProfile from './Profile';
 import { ballToken, bowlerLine, fixed, partnership, plural, strikeRate, summaryView, targetView } from './graphicStats';
 
 // Everything drawn on the green screen. Sizes are in --u (1% of a 16:9 frame), so it scales with the stage.
@@ -8,7 +9,7 @@ function TeamBlock({ state }) {
   return (
     <div className="gx-team">
       <span className="gx-tag">{config.teams[inn.battingTeam].name}</span>
-      <b className="gx-score">{inn.runs}<i>/{inn.wickets}</i></b>
+      <b className="gx-score" key={`${inn.runs}-${inn.wickets}`}>{inn.runs}<i>/{inn.wickets}</i></b>
       <span className="gx-ov">{formatOvers(inn.legalBalls, config.ballsPerOver)}<em> / {state.oversLimit} ov</em></span>
       {state.inSuper && <span className="gx-so">Super over</span>}
     </div>
@@ -16,12 +17,14 @@ function TeamBlock({ state }) {
 }
 
 function OverBalls({ inn, bpo }) {
-  const tokens = inn.overBalls.map(ballToken);
-  const left = Math.max(0, bpo - inn.overBalls.filter((b) => b.legal).length); // wides and no-balls add a box but don't use one up
+  // Over finished and the next bowler already picked: start the new over with empty boxes (the old over stays up until then).
+  const balls = inn.overComplete && inn.bowlerId ? [] : inn.overBalls;
+  const tokens = balls.map(ballToken);
+  const left = Math.max(0, bpo - balls.filter((b) => b.legal).length); // wides and no-balls add a box but don't use one up
   for (let i = 0; i < left; i++) tokens.push({ main: '', sub: '', cls: 'empty' });
   return (
     <div className="gx-balls">
-      {tokens.map((t, i) => <div key={i} className={`gx-tok ${t.cls}`}>{t.main}{t.sub && <small>{t.sub}</small>}</div>)}
+      {tokens.map((t, i) => <div key={`${i}${t.cls}${t.main}${t.sub}`} className={`gx-tok ${t.cls}`} style={{ '--k': i }}>{t.main}{t.sub && <small>{t.sub}</small>}</div>)}
     </div>
   );
 }
@@ -177,7 +180,7 @@ function SummaryBody({ state }) {
 
 const POP = { four: 'FOUR', six: 'SIX', wicket: 'WICKET' };
 
-export default function Scorebug({ state, mode, popup }) {
+export default function Scorebug({ state, mode, popup, profile }) {
   if (mode === 'hide') return <div className="gx-layer" />;
   const tv = mode === 'target' ? targetView(state) : null;
   const solo = mode === 'summary';
@@ -188,6 +191,7 @@ export default function Scorebug({ state, mode, popup }) {
     : <LiveBody state={state} />;
   return (
     <div className="gx-layer">
+      {profile && <div className="gx-prof-wrap" key={profile.id}><PlayerProfile profile={profile} /></div>}
       <div className="gx-stack" key={mode}>
         {popup && (
           <div className={`gx-pop ${popup.kind}`} key={popup.id}>
