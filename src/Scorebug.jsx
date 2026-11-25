@@ -1,5 +1,5 @@
 import { formatOvers, nameOf } from './engine';
-import { ballToken, bowlerLine, fixed, liveNote, partnership, plural, strikeRate, summaryView, targetView } from './graphicStats';
+import { ballToken, bowlerLine, fixed, partnership, plural, strikeRate, summaryView, targetView } from './graphicStats';
 
 // Everything drawn on the green screen. Sizes are in --u (1% of a 16:9 frame), so it scales with the stage.
 
@@ -179,7 +179,6 @@ const POP = { four: 'FOUR', six: 'SIX', wicket: 'WICKET' };
 
 export default function Scorebug({ state, mode, popup }) {
   if (mode === 'hide') return <div className="gx-layer" />;
-  const note = mode === 'live' ? liveNote(state) : null;
   const tv = mode === 'target' ? targetView(state) : null;
   const solo = mode === 'summary';
   const body = mode === 'batters' ? <BattersBody state={state} />
@@ -200,7 +199,6 @@ export default function Scorebug({ state, mode, popup }) {
             {!solo && <TeamBlock state={state} />}
             {body}
           </div>
-          {note && <div className="gx-note"><span>{note.left}</span>{note.right && <span>{note.right}</span>}</div>}
         </div>
       </div>
     </div>
