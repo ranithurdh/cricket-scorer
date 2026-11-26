@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_CONFIG } from './config';
 import Setup from './Setup';
 import EditMatch from './EditMatch';
@@ -8,7 +8,7 @@ import { RosterContext, useRosterState, useRoster } from './roster';
 import { fetchPlayerStats, fetchVersus } from './api';
 import { players, nameOf, formatOvers } from './engine';
 import { nameKey } from './members';
-import { h2h, lastWicket, matchCard, matchupToday, milestoneAlert, motmCard, playerToday, rankings, resultView, strikerLine, todayLine, wormView } from './graphicStats';
+import { h2h, lastWicket, matchCard, matchupToday, milestoneAlert, motmCard, playerToday, resultView, strikerLine, todayLine, wormView } from './graphicStats';
 import { useGraphicMatch, GFX_CONFIG_KEY, GFX_EVENTS_KEY } from './useGraphicMatch';
 import './graphic.css';
 
@@ -19,14 +19,15 @@ const LABEL = { bye: 'Bye', legbye: 'Leg bye', wide: 'WD', noball: 'NB' };
 const TITLE = { striker: 'Select striker', nonStriker: 'Select non-striker', bowler: 'Select bowler' };
 const MODES = [['live', 'Live'], ['target', 'Target'], ['batters', 'Batters'], ['bowler', 'Bowler'], ['summary', 'Summary'], ['hide', 'Hide']];
 const KEYS = { green: ['Green', '#00b140'], blue: ['Blue', '#0047bb'], magenta: ['Magenta', '#ff00ff'] };
-const POP_MS = 3300;
+const POP_MS = 2650;
 // How long each full-screen graphic plays before it is taken off (a little longer than its animation).
-const FX_MS = { transition: 2700, four: 3700, six: 4400, wicket: 4000, fifty: 4400, hundred: 5200, freehit: 3400, hattrick: 3800, result: 7000 };
+const FX_MS = { transition: 2160, four: 2960, six: 3520, wicket: 3200, fifty: 3520, hundred: 4160, freehit: 2720, hattrick: 3040, result: 5600 };
 const FX_BUTTONS = [
   ['transition', 'Transition', ''], ['four', '4 runs', 'f4'], ['six', '6 runs', 'f6'], ['wicket', 'Wicket', 'fw'],
   ['fifty', 'Fifty', ''], ['hundred', 'Hundred', ''], ['freehit', 'Free hit', ''], ['hattrick', 'Hat-trick', ''], ['result', 'Result', 'fr'],
 ];
 const ALERT_MS = 9000; // how long a milestone alert stays up
+const PROFILE_BUTTONS = [['striker', 'Striker'], ['non', 'Non-striker'], ['bowler', 'Bowler']];
 const PANEL_BUTTONS = [['teams', 'Teams'], ['worm', 'Worm'], ['matchup', 'Matchup'], ['card', 'Match card']];
 
 // A setting kept in this browser (so a refresh doesn't switch the mode back or change the key colour).
@@ -54,10 +55,8 @@ function Scoring({ config, onNew }) {
   const [flash, setFlash] = useState('');
   const [popup, setPopup] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [profilesOn, setProfilesOn] = usePersisted('gfx-profiles-v1', true);
   const [panel, setPanel] = useState(null);       // { kind: 'teams' | 'worm' | 'matchup' | 'card', id }
   const [fx, setFx] = useState(null);             // full-screen graphic being played
-  const [statsList, setStatsList] = useState(null); // everyone's career numbers (read only), for the rankings
   const [versus, setVersus] = useState(null);     // 1v1 history of the batter in the matchup pop-up
   const [matchBat, setMatchBat] = useState('striker'); // which batter the matchup pop-up follows
   const { roster } = useRoster();
@@ -100,46 +99,35 @@ function Scoring({ config, onNew }) {
     return () => clearTimeout(t);
   }, [popup]);
 
-  // Player card: appears when a new batter or bowler is picked (not on undo, redo or when the match is edited).
+  // Player card: pops up when the Striker / Non-striker / Bowler button is pressed (and fades when pressed again).
   // It only READS the saved players' career stats and faces from the database; nothing is written.
-  const showProfile = async (ev) => {
+  const roleId = (role) => (role === 'striker' ? inn.strikerId : role === 'non' ? inn.nonStrikerId : (inn.bowlerId ?? inn.prevBowlerId));
+  const showProfile = async (role) => {
+    const playerId = roleId(role);
     const id = ++profileSeq.current;
-    const kind = ev.role === 'bowler' ? 'bowl' : 'bat';
+    if (!playerId) { setFlash(`No ${role === 'non' ? 'non-striker' : role} selected yet`); return; }
+    const kind = role === 'bowler' ? 'bowl' : 'bat';
     const teamIdx = kind === 'bowl' ? inn.bowlingTeam : inn.battingTeam;
-    const pname = name(ev.playerId);
+    const pname = name(playerId);
     const entry = roster.find(pname);
     let list = statsCache.current;
     try {
       list = await Promise.race([fetchPlayerStats(), new Promise((_, no) => setTimeout(no, 1500))]);
       statsCache.current = list;
-      setStatsList(list);
     } catch { /* offline: use the last copy, or show the card without numbers */ }
     if (id !== profileSeq.current) return; // something newer happened while the stats were loading
     const stats = entry ? (list ?? []).find((p) => nameKey(p.name) === entry.key) ?? null : null;
-    setProfile({ id: Date.now(), kind, name: pname, team: config.teams[teamIdx].name, saved: !!entry, photo: stats?.photo ?? entry?.photo ?? null, stats });
+    setProfile({ id: Date.now(), role, kind, name: pname, team: config.teams[teamIdx].name, saved: !!entry, photo: stats?.photo ?? entry?.photo ?? null, stats });
   };
-  const prevEvLen = useRef(events.length);
-  useEffect(() => {
-    const len = events.length, last = events[len - 1];
-    if (len === prevEvLen.current + 1 && last?.type === 'select' && profilesOn) showProfile(last);
-    else if (len < prevEvLen.current) { profileSeq.current += 1; setProfile(null); }
-    prevEvLen.current = len;
-  }, [events]); // eslint-disable-line react-hooks/exhaustive-deps
-  // The card stays up until you fade it out with the button (or a new one replaces it).
-  const fadeProfile = () => setProfile(null);
+  const toggleProfile = (role) => {
+    if (profile?.role === role) { profileSeq.current += 1; setProfile(null); return; }
+    showProfile(role);
+  };
 
   // ----- pop-up panels (teams, worm, matchup, match card) -----
-  const loadStats = async () => {
-    try {
-      const list = await fetchPlayerStats();
-      statsCache.current = list;
-      setStatsList(list);
-    } catch { /* offline: the ranks stay blank */ }
-  };
   const togglePanel = (kind) => {
     if (panel?.kind === kind) { setPanel(null); return; }
     setPanel({ kind, id: Date.now() });
-    if (kind === 'teams' && !statsList) loadStats();
   };
 
   const matchBatId = matchBat === 'non' ? inn.nonStrikerId : inn.strikerId;
@@ -157,19 +145,17 @@ function Scoring({ config, onNew }) {
     return () => { dead = true; };
   }, [panel?.kind, matchBatName]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rk = useMemo(() => (statsList ? rankings(statsList) : null), [statsList]);
   let panelData = null;
   if (panel) {
     if (panel.kind === 'teams') {
+      const pts = new Map(playerToday(state).map((r) => [r.id, r.points]));
       panelData = {
-        kind: 'teams', id: panel.id, loading: !statsList,
+        kind: 'teams', id: panel.id, best: Math.max(0, ...pts.values()),
         teams: config.teams.map((t, k) => ({
           name: t.name, batting: inn.battingTeam === k,
           players: t.players.map((p, i) => {
             const e = roster.find(p.name);
-            const s = e && statsList ? statsList.find((x) => nameKey(x.name) === e.key) : null;
-            const r = s && rk ? rk.get(s.name) : null;
-            return { id: p.id, i, name: p.name, saved: !!e, photo: e?.photo ?? s?.photo ?? null, bat: r?.bat ?? null, bowl: r?.bowl ?? null };
+            return { id: p.id, i, name: p.name, saved: !!e, photo: e?.photo ?? null, points: pts.get(p.id) ?? 0 };
           }),
         })),
       };
@@ -221,7 +207,7 @@ function Scoring({ config, onNew }) {
     const e = roster.find(pname);
     if (!e) { setFlash(`${pname} is a guest: no career stats`); return; }
     let list = statsCache.current;
-    try { list = await fetchPlayerStats(); statsCache.current = list; setStatsList(list); } catch { /* offline: use the last copy */ }
+    try { list = await fetchPlayerStats(); statsCache.current = list; } catch { /* offline: use the last copy */ }
     const row = list?.find((x) => nameKey(x.name) === e.key);
     const a = row ? milestoneAlert(state, id, row, who === 'bowler' ? 'bowl' : 'bat') : null;
     if (!a) { setFlash(`No career stats for ${pname}`); return; }
@@ -265,7 +251,7 @@ function Scoring({ config, onNew }) {
     if (done && !wasDone.current && popsOn) {
       playFx('result');
       clearTimeout(cardTimer.current);
-      cardTimer.current = setTimeout(() => setPanel({ kind: 'card', id: Date.now() }), FX_MS.result - 900);
+      cardTimer.current = setTimeout(() => setPanel({ kind: 'card', id: Date.now() }), FX_MS.result - 720);
     }
     if (!done) clearTimeout(cardTimer.current);
     wasDone.current = done;
@@ -412,7 +398,7 @@ function Scoring({ config, onNew }) {
     <div className="gfx-page">
       <div className="gfx-band" style={{ '--key': KEYS[keyColour][1] }}>
         <div className={`gfx-stage ${guide ? 'guide' : ''}`}>
-          <Scorebug state={state} mode={mode} popup={popup} profile={profilesOn ? profile : null} panel={panelData} fx={fx} alert={alert} />
+          <Scorebug state={state} mode={mode} popup={popup} profile={profile} panel={panelData} fx={fx} alert={alert} />
         </div>
       </div>
 
@@ -429,10 +415,9 @@ function Scoring({ config, onNew }) {
             <button
               className="btn cut side"
               disabled={inn.closed || inn.alone || !inn.strikerId || !inn.nonStrikerId}
-              title="Swap striker and non-striker"
               onClick={() => dispatch({ type: 'swap' })}
             >⇄<small>Swap batters</small></button>
-            <button className="btn cut side" disabled={!events.length} title="Edit every ball" onClick={() => setEditor(true)}>✎<small>Edit match</small></button>
+            <button className="btn cut side" disabled={!events.length} onClick={() => setEditor(true)}>✎<small>Edit match</small></button>
             <button className="btn cut side" disabled={!canUndo} onClick={undo}>↶<small>Undo</small></button>
             <button className="btn cut side" disabled={!canRedo} onClick={redo}>↷<small>Redo</small></button>
             <button className="btn cut side drop" disabled={inn.closed} onClick={() => setModal({ type: 'drop' })}>🧤<small>Dropped catch</small></button>
@@ -459,9 +444,11 @@ function Scoring({ config, onNew }) {
               {PANEL_BUTTONS.map(([k, label]) => (
                 <button key={k} aria-pressed={panel?.kind === k} className={`btn cut gfx-b ${panel?.kind === k ? 'on' : ''}`} onClick={() => togglePanel(k)}>{label}</button>
               ))}
-              <button className={`btn cut gfx-b wide ${panel?.kind === 'motm' ? 'on' : ''}`} aria-pressed={panel?.kind === 'motm'} title="Pick the Man of the match: a card with their face and today's stats" onClick={toggleMotm}>Man of the match</button>
-              <button className={`btn cut gfx-b wide ${alert ? 'on' : ''}`} aria-pressed={!!alert} title="Career milestone alert for the striker, non-striker or bowler" onClick={toggleMilestone}>Milestone alert</button>
-              <button className="btn cut gfx-b fade" disabled={!profile} title="Fade the player card off the screen" onClick={fadeProfile}>Fade profile</button>
+              <button className={`btn cut gfx-b wide ${panel?.kind === 'motm' ? 'on' : ''}`} aria-pressed={panel?.kind === 'motm'} onClick={toggleMotm}>Man of the match</button>
+              <button className={`btn cut gfx-b wide ${alert ? 'on' : ''}`} aria-pressed={!!alert} onClick={toggleMilestone}>Milestone alert</button>
+              {PROFILE_BUTTONS.map(([k, label]) => (
+                <button key={k} aria-pressed={profile?.role === k} className={`btn cut gfx-b ${profile?.role === k ? 'on' : ''}`} onClick={() => toggleProfile(k)}>{label}</button>
+              ))}
             </div>
           </div>
           <div className="gfx-group">
@@ -474,12 +461,11 @@ function Scoring({ config, onNew }) {
           </div>
 
           <div className="gfx-foot">
-            <button className="chip-btn" onClick={nextKey} title="Change the screen colour to key out">Key colour: {KEYS[keyColour][0]}</button>
-            <button className="chip-btn" disabled={!fx} onClick={clearFx} title="Take the full-screen graphic off now">Clear graphic</button>
-            <button className="chip-btn" onClick={() => setMatchBat((b) => (b === 'striker' ? 'non' : 'striker'))} title="Which batter the Matchup pop-up follows">Matchup: {matchBat === 'striker' ? 'Striker' : 'Non-striker'}</button>
-            <button className="chip-btn" aria-pressed={popsOn} onClick={() => setPopsOn((v) => !v)} title="Show FOUR / SIX / WICKET banners, and play the result + match summary when the match ends">Pop-ups: {popsOn ? 'On' : 'Off'}</button>
-            <button className="chip-btn" aria-pressed={profilesOn} onClick={() => setProfilesOn((v) => !v)} title="Show a player card when a new batter or bowler is picked">Profiles: {profilesOn ? 'On' : 'Off'}</button>
-            <button className="chip-btn" aria-pressed={guide} onClick={() => setGuide((v) => !v)} title="Dashed outline of the 16:9 frame">Frame guide: {guide ? 'On' : 'Off'}</button>
+            <button className="chip-btn" onClick={nextKey}>Key colour: {KEYS[keyColour][0]}</button>
+            <button className="chip-btn" disabled={!fx} onClick={clearFx}>Clear graphic</button>
+            <button className="chip-btn" onClick={() => setMatchBat((b) => (b === 'striker' ? 'non' : 'striker'))}>Matchup: {matchBat === 'striker' ? 'Striker' : 'Non-striker'}</button>
+            <button className="chip-btn" aria-pressed={popsOn} onClick={() => setPopsOn((v) => !v)}>Pop-ups: {popsOn ? 'On' : 'Off'}</button>
+            <button className="chip-btn" aria-pressed={guide} onClick={() => setGuide((v) => !v)}>Frame guide: {guide ? 'On' : 'Off'}</button>
             <button className="chip-btn" onClick={onNew}>New match</button>
           </div>
         </div>

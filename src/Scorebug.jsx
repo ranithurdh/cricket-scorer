@@ -201,11 +201,11 @@ function useLeave(value, ms) {
 // profile: player card, stays up until it is set to null (then fades out). panel: teams / worm / matchup / match card pop-up.
 // fx: a full-screen moment (transition, FOUR, SIX, WICKET, result...). It is independent of Hide.
 export default function Scorebug({ state, mode, popup, profile, panel, fx, alert }) {
-  const [shown, hiding] = useLeave(mode === 'hide' ? null : mode, 700);
-  const [prof, profLeaving] = useLeave(profile, 800);
-  const [pan, panLeaving] = useLeave(panel, 600);
-  const [fxShown, fxLeaving] = useLeave(fx, 450);
-  const [alr, alrLeaving] = useLeave(alert, 800);
+  const [shown, hiding] = useLeave(mode === 'hide' ? null : mode, 560);
+  const [prof, profLeaving] = useLeave(profile, 640);
+  const [pan, panLeaving] = useLeave(panel, 480);
+  const [fxShown, fxLeaving] = useLeave(fx, 360);
+  const [alr, alrLeaving] = useLeave(alert, 640);
 
   const tv = shown === 'target' ? targetView(state) : null;
   const solo = shown === 'summary';

@@ -215,13 +215,11 @@ function Match({ config, onNew }) {
           <button
             className="btn cut side"
             disabled={inn.closed || inn.alone || !inn.strikerId || !inn.nonStrikerId}
-            title="Swap striker and non-striker"
             onClick={() => dispatch({ type: 'swap' })}
           >⇄<small>Swap batters</small></button>
-          <button className="btn cut side" disabled={!events.length} title="Edit every ball, flag balls out of the stats, revert dropped catches" onClick={() => setEditor(true)}>✎<small>Edit match</small></button>
+          <button className="btn cut side" disabled={!events.length} onClick={() => setEditor(true)}>✎<small>Edit match</small></button>
           <button
             className="btn cut side" disabled={!hasBalls || saveStatus === 'saving'}
-            title={hasBalls ? 'Save this match to the database now' : 'Score a ball first'}
             onClick={async () => setFlash((await saveNow()) ? 'Saved to the database ✓' : 'Not saved: is the server running and are you signed in?')}
           >💾<small>Save now</small></button>
           <button className="link-btn" onClick={onNew}>New match</button>
@@ -338,7 +336,7 @@ export default function App() {
           ].map(([key, label, icon]) => (
             <button
               key={key} className={`tab cut icon ${page === key ? 'on' : ''}`} onClick={() => go(key)}
-              aria-label={label} title={label} aria-current={page === key ? 'page' : undefined}
+              aria-label={label} aria-current={page === key ? 'page' : undefined}
             >{icon}</button>
           ))}
         </div>

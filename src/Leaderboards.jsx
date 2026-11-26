@@ -127,7 +127,7 @@ export default function Leaderboards() {
         <small>Rank by</small>
         <div className="chips">
           {[OVERALL, ...section.stats].map((s) => (
-            <button key={s.key} className={`chip ${s.key === stat.key ? 'on' : ''}`} title={s.hint} onClick={() => setSortKey((k) => ({ ...k, [tab]: s.key }))}>
+            <button key={s.key} className={`chip ${s.key === stat.key ? 'on' : ''}`} onClick={() => setSortKey((k) => ({ ...k, [tab]: s.key }))}>
               {s.label}
             </button>
           ))}

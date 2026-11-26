@@ -27,12 +27,12 @@ function PanelHead({ title, sub }) {
   );
 }
 
-// ---------- Teams: both squads with their faces and batting / bowling rank ----------
-function Rank({ label, r, loading }) {
+// ---------- Teams: both squads with their faces and points from this match ----------
+function Points({ value, top }) {
   return (
-    <span className={`gx-rk ${r ? (r.place === 1 ? 'first' : '') : 'none'}`} title={r ? `${r.place} of ${r.of} rated · rating ${r.score.toFixed(1)}` : ''}>
-      <small>{label}</small>
-      <b>{r ? `#${r.place}` : loading ? '…' : '—'}</b>
+    <span className={`gx-rk ${top ? 'first' : ''}`}>
+      <small>Pts</small>
+      <b>{value}</b>
     </span>
   );
 }
@@ -42,7 +42,7 @@ function TeamsPanel({ data }) {
   const row = Math.max(2.8, Math.min(4.4, 27 / n));
   return (
     <div className="gx-panel teams" style={{ '--row': row }}>
-      <PanelHead title="Teams" sub="Batting and bowling rank" />
+      <PanelHead title="Teams" sub="Points this match" />
       <div className="gx-teams">
         {data.teams.map((t, k) => (
           <section key={k} className="gx-tcol">
@@ -51,8 +51,7 @@ function TeamsPanel({ data }) {
               <div key={p.id} className="gx-pl" style={{ '--i': k * 4 + p.i }}>
                 <Face name={p.name} photo={p.photo} s={row - 0.5} />
                 <span className="gx-pl-name">{p.name}{!p.saved && <small>guest</small>}</span>
-                <Rank label="Bat" r={p.bat} loading={data.loading} />
-                <Rank label="Bowl" r={p.bowl} loading={data.loading} />
+                <Points value={p.points} top={p.points > 0 && p.points === data.best} />
               </div>
             ))}
             {!t.players.length && <div className="gx-pl none">No players</div>}
@@ -66,7 +65,7 @@ function TeamsPanel({ data }) {
 // ---------- Worm: runs against overs, one line per innings ----------
 function WormPanel({ data: v }) {
   const [fresh, setFresh] = useState(true); // wicket dots time themselves to the line drawing in; later ones appear at once
-  useEffect(() => { const t = setTimeout(() => setFresh(false), 2400); return () => clearTimeout(t); }, []);
+  useEffect(() => { const t = setTimeout(() => setFresh(false), 1920); return () => clearTimeout(t); }, []);
   const W = 1000, H = 400, L = 78, R = 30, T = 18, B = 54;
   const px = (x) => L + (x / v.xMax) * (W - L - R);
   const py = (y) => H - B - (y / v.yMax) * (H - T - B);
@@ -102,7 +101,7 @@ function WormPanel({ data: v }) {
             <g key={l.k} className={`gx-wline k${l.k}`}>
               {l.pts.length > 1 && <path className="gx-worm-line" d={d(l.pts)} pathLength="1" />}
               {l.wk.map((w, i) => (
-                <circle key={i} className="gx-wk" cx={px(w.x)} cy={py(w.y)} r="12" style={{ animationDelay: fresh ? `${0.35 + 1.5 * (w.x / Math.max(last.x, 0.01))}s` : '0s' }} />
+                <circle key={i} className="gx-wk" cx={px(w.x)} cy={py(w.y)} r="12" style={{ animationDelay: fresh ? `${0.28 + 1.2 * (w.x / Math.max(last.x, 0.01))}s` : '0s' }} />
               ))}
               {l.pts.length > 1 && <circle className="gx-head" cx={px(last.x)} cy={py(last.y)} r="8" />}
             </g>
@@ -142,7 +141,7 @@ function MatchupPanel({ data: m }) {
   else if (m.status === 'loading') line = 'Loading 1v1 history…';
   else if (m.status === 'guest') line = 'Career history is for saved players only';
   else if (m.status === 'offline') line = 'Could not load the 1v1 history';
-  else if (c && c.outs > 0) line = `${m.bowler.name} has dismissed ${m.batter.name} ${c.outs} ${plural(c.outs, 'time')} in ${c.innings} ${plural(c.innings, 'innings')}`;
+  else if (c && c.outs > 0) line = `${m.bowler.name} has dismissed ${m.batter.name} ${c.outs} ${plural(c.outs, 'time')} in ${c.innings} innings`;
   else if (c && c.balls > 0) line = `${m.batter.name} has not been dismissed by ${m.bowler.name} in ${c.balls} balls`;
   return (
     <div className="gx-panel matchup">

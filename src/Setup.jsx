@@ -63,7 +63,7 @@ export default function Setup({ initial, onStart, onCancel, standalone = false }
     <div className="setup">
       <div className="page-title">
         <h1>{standalone ? 'Graphic setup' : 'Match setup'}</h1>
-        <button className="chip-btn" onClick={split} title="Randomly split all saved players into two teams" disabled={MEMBERS.length < 2}>Shuffle teams</button>
+        <button className="chip-btn" onClick={split} disabled={MEMBERS.length < 2}>Shuffle teams</button>
       </div>
 
       {teams.map((t, i) => (
