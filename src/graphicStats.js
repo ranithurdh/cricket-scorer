@@ -141,3 +141,31 @@ export function wormNote(state) {
   if (state.target) return `${team} need ${state.need} more ${plural(state.need, 'run')} to win from ${state.ballsLeft} ${plural(state.ballsLeft, 'ball')}`;
   return `${team} ${inn.runs}-${inn.wickets} after ${formatOvers(inn.legalBalls, state.config.ballsPerOver)} overs`;
 }
+
+
+// ---- innings / match summary card ----
+
+// Innings summary during the first innings (and the break); match summary once the second innings has started.
+// Each innings lists its best three batters and best bowlers (two when both innings share the card).
+export function summaryCard(state) {
+  const { config } = state;
+  const bpo = config.ballsPerOver;
+  const kind = state.innings.length > 1 || state.matchOver ? 'match' : 'innings';
+  const innings = state.innings.map((i) => {
+    const batters = Object.entries(i.batters)
+      .filter(([, b]) => b.balls > 0 || b.status === 'out')
+      .sort((x, y) => y[1].runs - x[1].runs || x[1].balls - y[1].balls)
+      .slice(0, 3)
+      .map(([id, b]) => ({ name: nameOf(config, id), runs: b.runs, balls: b.balls, fours: b.fours, sixes: b.sixes, sr: strikeRate(b.runs, b.balls), out: b.status === 'out' }));
+    const bowlers = Object.entries(i.bowlers)
+      .filter(([, b]) => b.balls > 0)
+      .sort((x, y) => y[1].wickets - x[1].wickets || x[1].runs - y[1].runs || y[1].balls - x[1].balls)
+      .slice(0, kind === 'match' ? 2 : 3)
+      .map(([id, b]) => ({ name: nameOf(config, id), wickets: b.wickets, runs: b.runs, overs: formatOvers(b.balls, bpo), econ: b.balls ? (b.runs * bpo) / b.balls : null }));
+    return {
+      team: config.teams[i.battingTeam].name, runs: i.runs, wickets: i.wickets, overs: formatOvers(i.legalBalls, bpo),
+      rate: i.legalBalls ? (i.runs * bpo) / i.legalBalls : null, extras: i.extras, batters, bowlers,
+    };
+  });
+  return { kind, innings, status: summaryView(state).status };
+}

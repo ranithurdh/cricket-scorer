@@ -282,37 +282,55 @@
 .gx-fx-ring.r2 { border-width: calc(var(--u) * 0.25); border-color: var(--ivory); animation-delay: 0.5s; }
 @keyframes gx-ring-out { from { opacity: 0.95; transform: scale(0.3); } to { opacity: 0; transform: scale(3.2, 1.9); } }
 
-/* SIX: bigger band in lime, the ball flies over the top, sparks burst */
-.gx-fx.six .gx-fx-band { top: calc(var(--u) * 14); height: calc(var(--u) * 24); background: linear-gradient(100deg, var(--lime) 0%, #c3dd83 100%); border-color: var(--forest); animation-delay: 0.45s; }
+/* SIX: bigger band in lime, rings and sparks burst */
+.gx-fx.six .gx-fx-band { top: calc(var(--u) * 14); height: calc(var(--u) * 24); background: linear-gradient(100deg, var(--lime) 0%, #c3dd83 100%); border-color: var(--forest); }
 .gx-fx.six .gx-fx-word { font-size: calc(var(--u) * 21); color: var(--forest); text-shadow: calc(var(--u) * 0.55) calc(var(--u) * 0.55) 0 var(--ivory); }
-.gx-fx.six .gx-fx-word i { animation: gx-letter-six 0.6s cubic-bezier(0.2, 1.7, 0.4, 1) calc(0.85s + var(--k) * 0.09s) both; }
+.gx-fx.six .gx-fx-word i { animation: gx-letter-six 0.6s cubic-bezier(0.2, 1.7, 0.4, 1) calc(0.3s + var(--k) * 0.09s) both; }
 @keyframes gx-letter-six { from { opacity: 0; transform: scale(2.6) rotate(8deg); } to { opacity: 1; transform: none; } }
-.gx-fx.six .gx-fx-info { animation-delay: 1.3s; }
+.gx-fx.six .gx-fx-info { animation-delay: 0.8s; }
 .gx-fx.six .gx-fx-info em { background: var(--forest); color: var(--lime); }
 .gx-fx.six .gx-fx-info b { color: var(--forest); }
 .gx-fx.six .gx-fx-info small { color: var(--hunter); }
-.gx-fx.six .gx-fx-shine { animation-delay: 1.2s; }
-.gx-fx.six .gx-fx-ring { top: calc(var(--u) * 26); animation-delay: 0.9s; }
-.gx-fx.six .gx-fx-ring.r2 { animation-delay: 1.05s; }
-.gx-fx-ball { position: absolute; left: 0; top: 0; width: calc(var(--u) * 3.6); height: calc(var(--u) * 3.6); margin: calc(var(--u) * -1.8) 0 0 calc(var(--u) * -1.8); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #e5777a, var(--brick) 55%, var(--brick-dark)); box-shadow: 0 0 calc(var(--u) * 1.6) calc(var(--u) * 0.4) var(--lime); animation: gx-ball 1.15s cubic-bezier(0.35, 0.05, 0.6, 0.95) both; }
-.gx-fx-ball span { position: absolute; left: 8%; right: 8%; top: 50%; height: calc(var(--u) * 0.18); background: var(--ivory); border-radius: 99px; transform: translateY(-50%) rotate(-25deg); opacity: 0.9; }
-.gx-fx-ball::before { content: ''; position: absolute; right: 70%; top: 50%; width: calc(var(--u) * 16); height: calc(var(--u) * 1.8); margin-top: calc(var(--u) * -0.9); background: linear-gradient(90deg, transparent, var(--lime)); border-radius: 99px; transform-origin: right center; transform: rotate(24deg); opacity: 0.85; }
-@keyframes gx-ball {
-  0% { transform: translate(calc(var(--u) * 14), calc(var(--u) * 49)) scale(1.1); opacity: 0; }
-  8% { opacity: 1; }
-  30% { transform: translate(calc(var(--u) * 34), calc(var(--u) * 22)) scale(1.4); }
-  55% { transform: translate(calc(var(--u) * 56), calc(var(--u) * 7)) scale(1.5); }
-  80% { transform: translate(calc(var(--u) * 82), calc(var(--u) * 2)) scale(1.1); }
-  100% { transform: translate(calc(var(--u) * 112), calc(var(--u) * -6)) scale(0.5); opacity: 0.9; }
-}
-.gx-spark { position: absolute; left: 50%; top: calc(var(--u) * 26); width: calc(var(--u) * 1.7 * var(--s)); height: calc(var(--u) * 1.7 * var(--s)); margin: calc(var(--u) * -0.85) 0 0 calc(var(--u) * -0.85); background: var(--ivory); box-shadow: 0 0 0 calc(var(--u) * 0.15) var(--forest); border-radius: 18%; opacity: 0; animation: gx-spark 1.9s cubic-bezier(0.1, 0.7, 0.3, 1) 0.95s both; }
+.gx-fx.six .gx-fx-shine { animation-delay: 0.7s; }
+.gx-fx.six .gx-fx-ring { top: calc(var(--u) * 26); animation-delay: 0.4s; }
+.gx-fx.six .gx-fx-ring.r2 { animation-delay: 0.55s; }
+.gx-spark { position: absolute; left: 50%; top: calc(var(--u) * 26); width: calc(var(--u) * 1.7 * var(--s)); height: calc(var(--u) * 1.7 * var(--s)); margin: calc(var(--u) * -0.85) 0 0 calc(var(--u) * -0.85); background: var(--ivory); box-shadow: 0 0 0 calc(var(--u) * 0.15) var(--forest); border-radius: 18%; opacity: 0; animation: gx-spark 1.9s cubic-bezier(0.1, 0.7, 0.3, 1) 0.45s both; }
 .gx-spark.h1 { background: var(--forest); border-radius: 50%; box-shadow: 0 0 0 calc(var(--u) * 0.15) var(--lime); }
 .gx-spark.h2 { background: var(--brick); box-shadow: 0 0 0 calc(var(--u) * 0.15) var(--ivory); }
 @keyframes gx-spark { 0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(1); } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(260deg) scale(0.2); } }
 
+/* ---------- innings summary -> match summary card ---------- */
+.gx-sc-wrap { position: absolute; left: 0; right: 0; top: 0; bottom: calc(var(--u) * 8.6); z-index: 4; display: flex; align-items: center; justify-content: center; animation: gx-teams-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.gx-sc-wrap.out { animation: gx-teams-out 0.55s cubic-bezier(0.5, 0, 0.8, 0.4) both; }
+.gx-sc { position: relative; width: calc(var(--u) * 66); overflow: hidden; border-radius: calc(var(--u) * 0.9); background: linear-gradient(170deg, var(--hunter) 0%, var(--forest) 75%); border: calc(var(--u) * 0.15) solid var(--lime); box-shadow: 0 calc(var(--u) * 0.6) calc(var(--u) * 2) #0006; }
+.gx-sc.match { width: calc(var(--u) * 84); }
+.gx-sc-grid { display: flex; gap: calc(var(--u) * 1.4); padding: calc(var(--u) * 1.2) calc(var(--u) * 1.4) 0; }
+.gx-sc-in { flex: 1 1 0; min-width: 0; animation: gx-rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) calc(0.25s + var(--t) * 0.15s) both; }
+.gx-sc-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'team score' 'info score'; align-items: center; column-gap: calc(var(--u) * 1.4); padding: 0 calc(var(--u) * 0.4) calc(var(--u) * 0.8); color: var(--cream); }
+.gx-sc-team { grid-area: team; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--display); font-size: calc(var(--u) * 2.4); letter-spacing: 0.07em; text-transform: uppercase; color: var(--lime); }
+.gx-sc-score { grid-area: score; font-family: var(--display); font-weight: 400; font-size: calc(var(--u) * 5.6); line-height: 1; letter-spacing: 0.02em; }
+.gx-sc-score i { font-style: normal; font-size: calc(var(--u) * 3.4); color: var(--brick-soft); }
+.gx-sc-hero small { grid-area: info; font-size: calc(var(--u) * 1.2); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; color: var(--cream); opacity: 0.85; }
+.gx-sc-lists { display: flex; flex-direction: column; gap: calc(var(--u) * 0.8); }
+.gx-sc.innings .gx-sc-lists { flex-direction: row; gap: calc(var(--u) * 1.4); }
+.gx-sc.innings .gx-sc-list { flex: 1 1 0; min-width: 0; }
+.gx-sc-list { display: flex; flex-direction: column; gap: calc(var(--u) * 0.3); }
+.gx-sc-cols, .gx-sc-row { display: grid; grid-template-columns: 1fr repeat(3, calc(var(--u) * 5.2)); gap: calc(var(--u) * 0.4); align-items: center; }
+.gx-sc.match .gx-sc-cols, .gx-sc.match .gx-sc-row { grid-template-columns: 1fr repeat(2, calc(var(--u) * 6.4)); }
+.gx-sc-cols { color: var(--lime); font-size: calc(var(--u) * 1); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding-left: calc(var(--u) * 0.4); }
+.gx-sc-cols i { font-style: normal; text-align: center; }
+.gx-sc-row { height: calc(var(--u) * 2.6); animation: gx-row-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) calc(0.45s + var(--i) * 0.07s) both; }
+.gx-sc-name { height: 100%; display: flex; align-items: center; gap: calc(var(--u) * 0.4); min-width: 0; padding-left: calc(var(--u) * 0.9); background: linear-gradient(90deg, var(--sage), var(--moss)); color: var(--cream); font-size: calc(var(--u) * 1.3); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; clip-path: polygon(0 0, 100% 0, calc(100% - var(--u) * 0.5) 100%, 0 100%); }
+.gx-sc-name em { font-style: normal; color: var(--lime); }
+.gx-sc-row b { height: 100%; display: flex; align-items: center; justify-content: center; background: var(--ivory); color: var(--forest); font-family: var(--display); font-weight: 400; font-size: calc(var(--u) * 1.6); letter-spacing: 0.03em; white-space: nowrap; clip-path: polygon(calc(var(--u) * 0.4) 0, 100% 0, calc(100% - var(--u) * 0.4) 100%, 0 100%); }
+.gx-sc-row b small { margin-left: calc(var(--u) * 0.25); font-family: var(--ui); font-size: calc(var(--u) * 0.95); color: var(--muted); }
+.gx-sc-row b.dim { background: var(--sage-soft); font-size: calc(var(--u) * 1.4); }
+.gx-sc-row b.wk { background: var(--lime); }
+.gx-sc-extras { margin-top: calc(var(--u) * 0.7); padding-left: calc(var(--u) * 0.4); color: var(--cream); font-size: calc(var(--u) * 1.2); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.85; }
+
 @media (prefers-reduced-motion: reduce) {
   .gx-stack, .gx-pop, .gx-card, .gx-team, .gx-body > *, .gx-tok, .gx-score, .gx-tile, .gx-bcell,
-  .gx-prof-wrap, .gx-prof, .gx-prof *, .gx-prof-shine, .gx-stack.leaving, .gx-stack.leaving *, .gx-roll-edge, .gx-teams-wrap, .gx-tm, .gx-tm *, .gx-tm-shine, .gx-worm-wrap, .gx-worm *, .gx-worm-head, .gx-wl, .gx-wl-note, .gx-fx, .gx-fx * { animation: none !important; }
+  .gx-prof-wrap, .gx-prof, .gx-prof *, .gx-prof-shine, .gx-stack.leaving, .gx-stack.leaving *, .gx-roll-edge, .gx-teams-wrap, .gx-tm, .gx-tm *, .gx-tm-shine, .gx-worm-wrap, .gx-worm *, .gx-worm-head, .gx-wl, .gx-wl-note, .gx-fx, .gx-fx *, .gx-sc-wrap, .gx-sc *, .gx-sc-in { animation: none !important; }
   .gx-worm-svg .line path { stroke-dashoffset: 0; }
 }
 
@@ -330,6 +348,7 @@
 @media (max-width: 400px) { .gfx-util .btn.side { font-size: 12px; } .gfx-util .btn.side small { font-size: 10px; } }
 
 /* profile buttons: appear once a new batter / bowler has been picked; tap to show the card, tap again to hide it */
+.gfx-fxrow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
 .gfx-profs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
 .btn.gfx-prof-btn { min-height: 46px; padding: 4px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1.1; }
 .btn.gfx-prof-btn span { font-family: var(--display); font-size: 16px; letter-spacing: 0.08em; text-transform: uppercase; }

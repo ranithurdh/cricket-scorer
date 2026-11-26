@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatOvers, nameOf } from './engine';
 import PlayerProfile, { CountUp } from './Profile';
-import { ballToken, bowlerLine, fixed, partnership, plural, strikeRate, summaryView, targetView, wormData, wormNote } from './graphicStats';
+import { ballToken, bowlerLine, fixed, partnership, plural, strikeRate, summaryView, summaryCard, targetView, wormData, wormNote } from './graphicStats';
 
 // Everything drawn on the green screen. Sizes are in --u (1% of a 16:9 frame), so it scales with the stage.
 
@@ -307,7 +307,7 @@ function WormSlot({ on, state }) {
 }
 
 // FOUR and SIX take over the middle of the frame for a few seconds: a slanted band wipes in, the letters slam down,
-// rings and sparks burst out (and for a six the ball flies off over the top). Pure display, driven by `popup`.
+// rings and sparks burst out. Pure display, driven by `popup`.
 const SPARKS = Array.from({ length: 22 }, (_, i) => {
   const a = (i / 22) * Math.PI * 2 + ((i * 37) % 7) * 0.08;
   const d = 16 + ((i * 53) % 13) * 1.6;
@@ -320,7 +320,6 @@ function BoundaryFx({ popup }) {
   const word = six ? 'SIX' : 'FOUR';
   return (
     <div className={`gx-fx ${six ? 'six' : 'four'}`}>
-      {six && <div className="gx-fx-ball"><span /></div>}
       <div className="gx-fx-ring r1" /><div className="gx-fx-ring r2" />
       {six && SPARKS.map((sp, i) => (
         <i key={i} className={`gx-spark h${sp.hue}`} style={{ '--dx': `calc(var(--u) * ${sp.dx.toFixed(1)})`, '--dy': `calc(var(--u) * ${sp.dy.toFixed(1)})`, '--s': sp.s }} />
@@ -341,10 +340,66 @@ function BoundaryFx({ popup }) {
   );
 }
 
+// Innings summary (first innings and the break) that turns into the match summary in the second innings.
+function SummarySlot({ on, state }) {
+  const [held, leaving] = useLeave(on ? { id: 'summary' } : null);
+  if (!held) return null;
+  const { kind, innings, status } = summaryCard(state);
+  const match = kind === 'match';
+  const bat = (b, i) => (
+    <div key={`b${i}`} className="gx-sc-row" style={{ '--i': i }}>
+      <span className="gx-sc-name">{b.name}{!b.out && <em>*</em>}</span>
+      <b>{b.runs}<small>({b.balls})</small></b>
+      {!match && <b className="dim">{b.fours}/{b.sixes}</b>}
+      <b className="dim">{fixed(b.sr)}</b>
+    </div>
+  );
+  const bowl = (b, i) => (
+    <div key={`w${i}`} className="gx-sc-row" style={{ '--i': i + 3 }}>
+      <span className="gx-sc-name">{b.name}</span>
+      <b className="wk">{b.wickets}-{b.runs}</b>
+      {!match && <b className="dim">{b.overs}</b>}
+      <b className="dim">{fixed(b.econ, 2)}</b>
+    </div>
+  );
+  const labels = (a, b, c) => <div className="gx-sc-cols"><span>{a}</span>{b.map((x) => <i key={x}>{x}</i>)}{c}</div>;
+  return (
+    <div className={`gx-sc-wrap ${leaving ? 'out' : ''}`}>
+      <div className={`gx-sc ${match ? 'match' : 'innings'}`}>
+        <div className="gx-tm-shine" />
+        <header className="gx-worm-head"><b>{match ? 'Match summary' : 'Innings summary'}</b><small>{match ? innings.map((i) => i.team).join(' v ') : innings[0].team}</small></header>
+        <div className="gx-sc-grid">
+          {innings.map((inn, ii) => (
+            <section key={ii} className="gx-sc-in" style={{ '--t': ii }}>
+              <div className="gx-sc-hero">
+                <span className="gx-sc-team">{inn.team}</span>
+                <b className="gx-sc-score">{inn.runs}<i>/{inn.wickets}</i></b>
+                <small>{inn.overs} overs{inn.rate !== null && ` · RR ${fixed(inn.rate, 2)}`}</small>
+              </div>
+              <div className="gx-sc-lists">
+                <div className="gx-sc-list">
+                  {labels('Batting', match ? ['R (B)', 'SR'] : ['R (B)', '4/6', 'SR'], null)}
+                  {inn.batters.map(bat)}
+                </div>
+                <div className="gx-sc-list">
+                  {labels('Bowling', match ? ['W-R', 'Econ'] : ['W-R', 'Ov', 'Econ'], null)}
+                  {inn.bowlers.map(bowl)}
+                </div>
+              </div>
+              {!match && <div className="gx-sc-extras">Extras {inn.extras}</div>}
+            </section>
+          ))}
+        </div>
+        <footer className="gx-wl-note" key={status}>{status}</footer>
+      </div>
+    </div>
+  );
+}
+
 const POP = { four: 'FOUR', six: 'SIX', wicket: 'WICKET' };
 const HIDE_MS = 1050; // keep in step with the .leaving animations in graphic.css
 
-export default function Scorebug({ state, mode, popup, profile, teams, worm }) {
+export default function Scorebug({ state, mode, popup, profile, teams, worm, summary }) {
   const live = mode !== 'hide';
   const lastMode = useRef(mode);
   if (live) lastMode.current = mode;
@@ -373,6 +428,7 @@ export default function Scorebug({ state, mode, popup, profile, teams, worm }) {
       <ProfileSlot profile={live ? profile : null} />
       <TeamsSlot teams={live ? teams : null} />
       <WormSlot on={live && !!worm} state={state} />
+      <SummarySlot on={live && !!summary} state={state} />
       <div className={`gx-stack ${leaving ? 'leaving' : ''}`} key={shownMode}>
         {popup && live && popup.kind === 'wicket' && (
           <div className={`gx-pop ${popup.kind}`} key={popup.id}>

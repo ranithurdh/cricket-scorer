@@ -50,6 +50,7 @@ function Scoring({ config, onNew }) {
   const [openProfileId, setOpenProfileId] = useState(null);
   const [teamsOpen, setTeamsOpen] = useState(false);
   const [wormOpen, setWormOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [statsList, setStatsList] = useState(null);
   const { roster } = useRoster();
   const statsCache = useRef(null);
@@ -66,17 +67,16 @@ function Scoring({ config, onNew }) {
     return () => clearTimeout(t);
   }, [flash]);
 
-  // Four / six / wicket banner: appears when a ball is scored (not on undo, not when the innings changes).
+  // Wicket banner: appears when a wicket falls (not on undo, not when the innings changes).
   const prevLen = useRef(inn.log.length);
   useEffect(() => {
     const len = inn.log.length, last = inn.log[len - 1];
     if (len === prevLen.current + 1 && last && popsOn) {
-      const kind = last.wicket ? 'wicket' : last.batRuns === 6 ? 'six' : last.batRuns === 4 ? 'four' : null;
-      if (kind) {
-        let sub = name(last.strikerId);
-        if (last.wicket) { const b = inn.batters[last.wicket.outId]; sub = b ? `${name(last.wicket.outId)} ${b.runs}(${b.balls})` : name(last.wicket.outId); }
-        const detail = `${last.strikerRuns} (${last.strikerBalls}) · off ${name(last.bowlerId)}`;
-        setPopup({ kind, sub, detail, id: Date.now() });
+      // Only wickets pop up by themselves. FOUR and SIX are never triggered by scoring: use their own buttons.
+      if (last.wicket) {
+        const b = inn.batters[last.wicket.outId];
+        const sub = b ? `${name(last.wicket.outId)} ${b.runs}(${b.balls})` : name(last.wicket.outId);
+        setPopup({ kind: 'wicket', sub, id: Date.now() });
       }
     } else if (len < prevLen.current) setPopup(null);
     prevLen.current = len;
@@ -86,6 +86,16 @@ function Scoring({ config, onNew }) {
     const t = setTimeout(() => setPopup(null), popup.kind === 'wicket' ? POP_MS : FX_MS);
     return () => clearTimeout(t);
   }, [popup]);
+
+  // FOUR / SIX animations, shown only when you press their buttons (they use the current batter and bowler).
+  const fireFx = (kind) => {
+    const b = inn.batters[inn.strikerId];
+    setPopup({
+      kind, id: Date.now(),
+      sub: inn.strikerId ? name(inn.strikerId) : '',
+      detail: b && inn.bowlerId ? `${b.runs} (${b.balls}) · off ${name(inn.bowlerId)}` : '',
+    });
+  };
 
   // Keep the three profile controls tied to the players currently occupying each live position.
   // The graphic only reads saved player stats/photos; no match, database or stats records are changed.
@@ -154,7 +164,7 @@ function Scoring({ config, onNew }) {
   // Teams card: both squads with faces and Bat / Bowl / All-round points. Only reads the saved players' stats.
   const toggleTeams = async () => {
     if (teamsOpen) { setTeamsOpen(false); return; }
-    setWormOpen(false); // both are centred on the frame, so only one at a time
+    setWormOpen(false); setSummaryOpen(false); // these cards are all centred on the frame, so only one at a time
     setTeamsOpen(true);
     if (statsCache.current) setStatsList(statsCache.current);
     try {
@@ -164,7 +174,10 @@ function Scoring({ config, onNew }) {
     } catch { /* offline: faces and names still show, points stay blank */ }
   };
   // Worm graph: drawn from this match only (nothing is fetched), and it redraws on every ball.
-  const toggleWorm = () => { setTeamsOpen(false); setWormOpen((v) => !v); };
+  const toggleWorm = () => { setTeamsOpen(false); setSummaryOpen(false); setWormOpen((v) => !v); };
+  // Innings summary in the first innings, match summary once the second has started. Drawn from this match only.
+  const toggleSummary = () => { setTeamsOpen(false); setWormOpen(false); setSummaryOpen((v) => !v); };
+  const summaryLabel = state.innings.length > 1 || state.matchOver ? 'Match' : 'Innings';
   const teamsView = useMemo(() => {
     const list = statsList ?? [];
     const bat = overallRatings(list, 'batting', (p) => p.batting.innings > 0).map;
@@ -312,7 +325,7 @@ function Scoring({ config, onNew }) {
     <div className="gfx-page">
       <div className="gfx-band" style={{ '--key': KEYS[keyColour][1] }}>
         <div className={`gfx-stage ${guide ? 'guide' : ''}`}>
-          <Scorebug state={state} mode={mode} popup={popup} profile={profile} teams={teamsOpen ? teamsView : null} worm={wormOpen} />
+          <Scorebug state={state} mode={mode} popup={popup} profile={profile} teams={teamsOpen ? teamsView : null} worm={wormOpen} summary={summaryOpen} />
         </div>
       </div>
 
@@ -324,12 +337,20 @@ function Scoring({ config, onNew }) {
             ))}
           </div>
 
+          <div className="gfx-fxrow" role="group" aria-label="Boundary animations">
+            <button className="btn cut gfx-prof-btn" onClick={() => fireFx('four')} title="Play the FOUR animation on the graphic"><span>Four</span><small>Play animation</small></button>
+            <button className="btn cut gfx-prof-btn" onClick={() => fireFx('six')} title="Play the SIX animation on the graphic"><span>Six</span><small>Play animation</small></button>
+          </div>
+
           <div className="gfx-profs" role="group" aria-label="Teams and player profiles">
             <button className={`btn cut gfx-prof-btn ${teamsOpen ? 'on' : ''}`} aria-pressed={teamsOpen} onClick={toggleTeams} title={teamsOpen ? 'Hide the teams' : 'Show both teams with their points'}>
               <span>Teams</span><small>Squads &amp; points</small>
             </button>
             <button className={`btn cut gfx-prof-btn ${wormOpen ? 'on' : ''}`} aria-pressed={wormOpen} onClick={toggleWorm} title={wormOpen ? 'Hide the worm graph' : 'Show the runs worm graph (updates every ball)'}>
               <span>Worm</span><small>Runs by ball</small>
+            </button>
+            <button className={`btn cut gfx-prof-btn ${summaryOpen ? 'on' : ''}`} aria-pressed={summaryOpen} onClick={toggleSummary} title={summaryOpen ? 'Hide the summary' : `Show the ${summaryLabel.toLowerCase()} summary`}>
+              <span>{summaryLabel}</span><small>Summary card</small>
             </button>
             {[
               ['striker', 'Striker'],
@@ -380,7 +401,7 @@ function Scoring({ config, onNew }) {
 
           <div className="gfx-foot">
             <button className="chip-btn" onClick={nextKey} title="Change the screen colour to key out">Key colour: {KEYS[keyColour][0]}</button>
-            <button className="chip-btn" aria-pressed={popsOn} onClick={() => setPopsOn((v) => !v)} title="Show FOUR / SIX / WICKET banners">Pop-ups: {popsOn ? 'On' : 'Off'}</button>
+            <button className="chip-btn" aria-pressed={popsOn} onClick={() => setPopsOn((v) => !v)} title="Show the WICKET banner when a wicket falls (the FOUR and SIX buttons always work)">Pop-ups: {popsOn ? 'On' : 'Off'}</button>
             <button className="chip-btn" aria-pressed={guide} onClick={() => setGuide((v) => !v)} title="Dashed outline of the 16:9 frame">Frame guide: {guide ? 'On' : 'Off'}</button>
             <button className="chip-btn" onClick={onNew}>New match</button>
           </div>
