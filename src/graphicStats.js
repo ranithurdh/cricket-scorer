@@ -107,3 +107,37 @@ export function liveNote(state) {
   if (state.target) return { left: `Need ${state.need} from ${state.ballsLeft} ${plural(state.ballsLeft, 'ball')}`, right: `Target ${state.target}` };
   return null;
 }
+
+
+// ---- worm graph ----
+
+// Runs against overs for each innings, ball by ball. x is overs as a decimal (3.5 = 3 overs and 3 of 6 balls),
+// y is the total. Wides and no-balls add runs without moving along, so they show as a step up.
+export function wormData(state) {
+  const bpo = state.config.ballsPerOver;
+  const lines = state.innings.map((inn) => {
+    const points = [{ x: 0, y: 0 }];
+    const wickets = [];
+    let legal = 0;
+    for (const e of inn.log) {
+      if (e.legal) legal += 1;
+      const x = legal / bpo;
+      points.push({ x, y: e.runsAfter }); // a wide or no-ball repeats x, so it draws as a step straight up
+      if (e.wicketsAfter > (wickets.length)) wickets.push({ x, y: e.runsAfter });
+    }
+    return {
+      team: state.config.teams[inn.battingTeam].name, points, wickets,
+      runs: inn.runs, outs: inn.wickets, overs: formatOvers(inn.legalBalls, bpo), balls: inn.log.length, closed: !!inn.closed,
+    };
+  });
+  return { lines, maxOvers: state.oversLimit, target: state.target ?? null };
+}
+
+// The line under the worm graph.
+export function wormNote(state) {
+  const inn = state.current;
+  const team = state.config.teams[inn.battingTeam].name;
+  if (state.matchOver && state.result) return state.result;
+  if (state.target) return `${team} need ${state.need} more ${plural(state.need, 'run')} to win from ${state.ballsLeft} ${plural(state.ballsLeft, 'ball')}`;
+  return `${team} ${inn.runs}-${inn.wickets} after ${formatOvers(inn.legalBalls, state.config.ballsPerOver)} overs`;
+}

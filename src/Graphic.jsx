@@ -20,6 +20,7 @@ const TITLE = { striker: 'Select striker', nonStriker: 'Select non-striker', bow
 const MODES = [['live', 'Live'], ['target', 'Target'], ['batters', 'Batters'], ['bowler', 'Bowler'], ['summary', 'Summary'], ['hide', 'Hide']];
 const KEYS = { green: ['Green', '#00b140'], blue: ['Blue', '#0047bb'], magenta: ['Magenta', '#ff00ff'] };
 const POP_MS = 3300;
+const FX_MS = 4600; // the big four / six animations
 
 // A setting kept in this browser (so a refresh doesn't switch the mode back or change the key colour).
 function usePersisted(key, initial, valid) {
@@ -48,6 +49,7 @@ function Scoring({ config, onNew }) {
   const [cards, setCards] = useState({ striker: null, nonStriker: null, bowler: null });
   const [openProfileId, setOpenProfileId] = useState(null);
   const [teamsOpen, setTeamsOpen] = useState(false);
+  const [wormOpen, setWormOpen] = useState(false);
   const [statsList, setStatsList] = useState(null);
   const { roster } = useRoster();
   const statsCache = useRef(null);
@@ -73,14 +75,15 @@ function Scoring({ config, onNew }) {
       if (kind) {
         let sub = name(last.strikerId);
         if (last.wicket) { const b = inn.batters[last.wicket.outId]; sub = b ? `${name(last.wicket.outId)} ${b.runs}(${b.balls})` : name(last.wicket.outId); }
-        setPopup({ kind, sub, id: Date.now() });
+        const detail = `${last.strikerRuns} (${last.strikerBalls}) · off ${name(last.bowlerId)}`;
+        setPopup({ kind, sub, detail, id: Date.now() });
       }
     } else if (len < prevLen.current) setPopup(null);
     prevLen.current = len;
   }, [inn]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!popup) return undefined;
-    const t = setTimeout(() => setPopup(null), POP_MS);
+    const t = setTimeout(() => setPopup(null), popup.kind === 'wicket' ? POP_MS : FX_MS);
     return () => clearTimeout(t);
   }, [popup]);
 
@@ -151,6 +154,7 @@ function Scoring({ config, onNew }) {
   // Teams card: both squads with faces and Bat / Bowl / All-round points. Only reads the saved players' stats.
   const toggleTeams = async () => {
     if (teamsOpen) { setTeamsOpen(false); return; }
+    setWormOpen(false); // both are centred on the frame, so only one at a time
     setTeamsOpen(true);
     if (statsCache.current) setStatsList(statsCache.current);
     try {
@@ -159,6 +163,8 @@ function Scoring({ config, onNew }) {
       setStatsList(list);
     } catch { /* offline: faces and names still show, points stay blank */ }
   };
+  // Worm graph: drawn from this match only (nothing is fetched), and it redraws on every ball.
+  const toggleWorm = () => { setTeamsOpen(false); setWormOpen((v) => !v); };
   const teamsView = useMemo(() => {
     const list = statsList ?? [];
     const bat = overallRatings(list, 'batting', (p) => p.batting.innings > 0).map;
@@ -306,7 +312,7 @@ function Scoring({ config, onNew }) {
     <div className="gfx-page">
       <div className="gfx-band" style={{ '--key': KEYS[keyColour][1] }}>
         <div className={`gfx-stage ${guide ? 'guide' : ''}`}>
-          <Scorebug state={state} mode={mode} popup={popup} profile={profile} teams={teamsOpen ? teamsView : null} />
+          <Scorebug state={state} mode={mode} popup={popup} profile={profile} teams={teamsOpen ? teamsView : null} worm={wormOpen} />
         </div>
       </div>
 
@@ -321,6 +327,9 @@ function Scoring({ config, onNew }) {
           <div className="gfx-profs" role="group" aria-label="Teams and player profiles">
             <button className={`btn cut gfx-prof-btn ${teamsOpen ? 'on' : ''}`} aria-pressed={teamsOpen} onClick={toggleTeams} title={teamsOpen ? 'Hide the teams' : 'Show both teams with their points'}>
               <span>Teams</span><small>Squads &amp; points</small>
+            </button>
+            <button className={`btn cut gfx-prof-btn ${wormOpen ? 'on' : ''}`} aria-pressed={wormOpen} onClick={toggleWorm} title={wormOpen ? 'Hide the worm graph' : 'Show the runs worm graph (updates every ball)'}>
+              <span>Worm</span><small>Runs by ball</small>
             </button>
             {[
               ['striker', 'Striker'],
