@@ -23,7 +23,7 @@ function rowsFor(profile) {
 }
 
 // Counts up from 0 to the value (numbers only; "27/39" and "-" are shown as they are).
-export function CountUp({ value, delay }) {
+function CountUp({ value, delay }) {
   const text = value ?? '-';
   const target = Number(text);
   const numeric = value !== null && value !== undefined && Number.isFinite(target) && /^-?\d+(\.\d+)?$/.test(text);
@@ -55,7 +55,7 @@ export default function PlayerProfile({ profile }) {
   const showPhoto = !!profile.photo && !broken; // no saved face, no picture
   const isBowl = profile.kind === 'bowl';
   return (
-    <div className={`gx-prof ${isBowl ? 'bowl' : 'bat'} ${showPhoto ? 'has-photo' : ''}`} key={profile.id}>
+    <div className={`gx-prof ${isBowl ? 'bowling' : 'bat'} ${showPhoto ? 'has-photo' : ''}`} key={profile.id}>
       <div className="gx-prof-shine" />
       <header className="gx-prof-head">
         <b>{isBowl ? 'Bowler profile' : 'Batter profile'}</b>

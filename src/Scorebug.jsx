@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatOvers, nameOf } from './engine';
-import PlayerProfile, { CountUp } from './Profile';
-import { ballToken, bowlerLine, fixed, partnership, plural, strikeRate, summaryView, summaryCard, targetView, wormData, wormNote } from './graphicStats';
+import PlayerProfile from './Profile';
+import { Panel, Fx, AlertCard } from './Gfx';
+import { ballToken, bowlerLine, fixed, partnership, plural, strikeRate, summaryView, targetView } from './graphicStats';
 
 // Everything drawn on the green screen. Sizes are in --u (1% of a 16:9 frame), so it scales with the stage.
 
@@ -48,7 +49,7 @@ function LiveBody({ state }) {
     <div className="gx-body live">
       <div className="gx-batters">{bat(inn.strikerId, true)}{bat(inn.nonStrikerId, false)}</div>
       <div className="gx-bowler">
-        <div className="gx-bat bowl">
+        <div className="gx-bat bowling">
           <span className="gx-name"><em className="ptr">●</em>{nameOf(config, inn.bowlerId) || '—'}</span>
           <b>{bw ? `${bw.wickets}-${bw.runs}` : ''}<small>{bw ? `(${formatOvers(bw.balls, bpo)})` : ''}</small></b>
         </div>
@@ -75,7 +76,7 @@ function BattersBody({ state }) {
     );
   };
   return (
-    <div className="gx-body bats">
+    <div className="gx-body pair">
       {cell(inn.strikerId, true)}
       {cell(inn.nonStrikerId, false)}
       <div className="gx-bcell part">
@@ -92,7 +93,7 @@ function BowlerBody({ state }) {
   const line = bowlerLine(inn, inn.bowlerId, bpo);
   const tile = (label, value, cls = '') => <div className={`gx-tile ${cls}`}><b>{value}</b><small>{label}</small></div>;
   return (
-    <div className="gx-body bowl">
+    <div className="gx-body bowling">
       <span className="gx-name big"><em className="ptr">●</em>{nameOf(config, inn.bowlerId) || '—'}</span>
       <div className="gx-tiles five">
         {tile('Overs', line ? line.overs : '-')}
@@ -179,270 +180,61 @@ function SummaryBody({ state }) {
   );
 }
 
-// Keeps the last value on screen while its exit animation plays, so hiding anything animates too.
-function useLeave(value, ms = 600) {
-  const [held, setHeld] = useState(value);
+const POP = { four: 'FOUR', six: 'SIX', wicket: 'WICKET' };
+
+// Keeps showing the last value for `ms` after it goes away, so the thing can play an exit animation.
+// Returns [what to draw, is it on its way out].
+function useLeave(value, ms) {
+  const [shown, setShown] = useState(value);
   const [leaving, setLeaving] = useState(false);
   useEffect(() => {
-    if (value) { setHeld(value); setLeaving(false); return undefined; }
-    if (!held) return undefined;
+    if (value) { setShown(value); setLeaving(false); return undefined; }
+    if (!shown) return undefined;
     setLeaving(true);
-    const t = setTimeout(() => { setHeld(null); setLeaving(false); }, ms);
+    const t = setTimeout(() => { setShown(null); setLeaving(false); }, ms);
     return () => clearTimeout(t);
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
-  return [held, leaving];
+  return [shown, leaving];
 }
 
-function ProfileSlot({ profile }) {
-  const [held, leaving] = useLeave(profile);
-  if (!held) return null;
-  return <div className={`gx-prof-wrap ${leaving ? 'out' : ''}`} key={held.id}><PlayerProfile profile={held} /></div>;
-}
+// mode: live | target | batters | bowler | summary | hide. Hide plays an exit animation, then clears the screen.
+// profile: player card, stays up until it is set to null (then fades out). panel: teams / worm / matchup / match card pop-up.
+// fx: a full-screen moment (transition, FOUR, SIX, WICKET, result...). It is independent of Hide.
+export default function Scorebug({ state, mode, popup, profile, panel, fx, alert }) {
+  const [shown, hiding] = useLeave(mode === 'hide' ? null : mode, 700);
+  const [prof, profLeaving] = useLeave(profile, 800);
+  const [pan, panLeaving] = useLeave(panel, 600);
+  const [fxShown, fxLeaving] = useLeave(fx, 450);
+  const [alr, alrLeaving] = useLeave(alert, 800);
 
-// Both squads, centred on the frame: face, name and the Bat / Bowl / All-round points (same ratings as the Home leaderboard).
-const pts = (v) => (v == null ? null : v.toFixed(1));
-const initials = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
-
-function Face({ row }) {
-  const [broken, setBroken] = useState(false);
-  useEffect(() => { setBroken(false); }, [row.photo]);
-  return (
-    <span className="gx-tm-face">
-      {row.photo && !broken ? <img src={row.photo} alt="" draggable={false} onError={() => setBroken(true)} /> : <em>{initials(row.name)}</em>}
-    </span>
-  );
-}
-
-function TeamsSlot({ teams }) {
-  const [held, leaving] = useLeave(teams);
-  if (!held) return null;
-  const most = Math.max(...held.map((t) => t.rows.length), 1);
-  const rh = Math.min(3.2, 36 / most); // rows shrink a little for big squads so everything fits the frame
-  return (
-    <div className={`gx-teams-wrap ${leaving ? 'out' : ''}`}>
-      <div className="gx-teams" style={{ '--rh': `calc(var(--u) * ${rh})` }}>
-        {held.map((t, ti) => (
-          <section key={ti} className="gx-tm" style={{ '--t': ti }}>
-            <div className="gx-tm-shine" />
-            <header className="gx-tm-head"><b>{t.name}</b><small>{t.rows.length} players</small></header>
-            <div className="gx-tm-cols"><span /><span>Player</span><i>Bat</i><i>Bowl</i><i>All</i></div>
-            <div className="gx-tm-rows">
-              {t.rows.map((r, i) => (
-                <div key={r.id} className="gx-tm-row" style={{ '--i': i }}>
-                  <Face row={r} />
-                  <span className="gx-tm-name">{r.name}</span>
-                  <b><CountUp value={pts(r.bat)} delay={400 + i * 60} /></b>
-                  <b><CountUp value={pts(r.bowl)} delay={400 + i * 60} /></b>
-                  <b className="all"><CountUp value={pts(r.all)} delay={400 + i * 60} /></b>
-                </div>
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Runs-by-ball worm graph for both innings. It is drawn straight from the match state, so it moves on every ball.
-const WW = 600, WH = 270, WL = 42, WR = 16, WT = 26, WB = 28;
-const niceStep = (max) => [10, 20, 25, 30, 40, 50, 100, 200].find((st) => max / st <= 5) ?? 200;
-
-function WormSlot({ on, state }) {
-  const [held, leaving] = useLeave(on ? { id: 'worm' } : null);
-  if (!held) return null;
-  const { lines, maxOvers, target } = wormData(state);
-  const peak = Math.max(10, target ?? 0, ...lines.map((l) => l.runs));
-  const step = niceStep(peak);
-  const yMax = Math.ceil(peak / step) * step;
-  const sx = (x) => WL + (x / maxOvers) * (WW - WL - WR);
-  const sy = (y) => WH - WB - (y / yMax) * (WH - WT - WB);
-  const xStep = maxOvers <= 10 ? 1 : maxOvers <= 20 ? 2 : 5;
-  const xs = []; for (let o = 0; o <= maxOvers; o += xStep) xs.push(o);
-  const ys = []; for (let r = 0; r <= yMax; r += step) ys.push(r);
-  const subtitle = `${state.config.teams.map((t) => t.name).join(' v ')}`;
-  return (
-    <div className={`gx-worm-wrap ${leaving ? 'out' : ''}`}>
-      <div className="gx-worm">
-        <div className="gx-tm-shine" />
-        <header className="gx-worm-head"><b>Comparison</b><small>{subtitle}</small></header>
-        <svg className="gx-worm-svg" viewBox={`0 0 ${WW} ${WH}`}>
-          {ys.map((r) => (
-            <g key={`y${r}`}>
-              <line x1={WL} x2={WW - WR} y1={sy(r)} y2={sy(r)} className="grid" />
-              <text x={WL - 8} y={sy(r) + 5} className="tick" textAnchor="end">{r}</text>
-            </g>
-          ))}
-          {xs.map((o) => <text key={`x${o}`} x={sx(o)} y={WH - 7} className="tick" textAnchor="middle">{o}</text>)}
-          <text x={WL} y={WT - 12} className="axis-label" textAnchor="middle">RUNS</text>
-          <line x1={WL} x2={WL} y1={WT} y2={WH - WB} className="axis" />
-          <line x1={WL} x2={WW - WR} y1={WH - WB} y2={WH - WB} className="axis" />
-          {target && <line x1={WL} x2={WW - WR} y1={sy(target)} y2={sy(target)} className="target" />}
-          {lines.map((l, i) => {
-            const end = l.points[l.points.length - 1];
-            return (
-              <g key={i} className={`line l${i}`}>
-                <path d={l.points.map((pt, k) => `${k ? 'L' : 'M'}${sx(pt.x).toFixed(1)} ${sy(pt.y).toFixed(1)}`).join(' ')} pathLength="1" />
-                {l.wickets.map((w, k) => <circle key={k} className="wk" cx={sx(w.x)} cy={sy(w.y)} r="6.5" />)}
-                {!l.closed && l.balls > 0 && (
-                  <g transform={`translate(${sx(end.x).toFixed(1)} ${sy(end.y).toFixed(1)})`}>
-                    <g className="pop" key={l.balls}><circle className="head-ring" r="6" /><circle className="head" r="5" /></g>
-                  </g>
-                )}
-              </g>
-            );
-          })}
-        </svg>
-        <div className="gx-wl-rows">
-          {lines.map((l, i) => (
-            <div key={i} className={`gx-wl l${i}`} style={{ '--i': i }}>
-              <span className="gx-wl-name">{l.team}</span><b>{l.runs}-{l.outs}</b><em>{l.overs} overs</em>
-            </div>
-          ))}
-        </div>
-        <footer className="gx-wl-note" key={wormNote(state)}>{wormNote(state)}</footer>
-      </div>
-    </div>
-  );
-}
-
-// FOUR and SIX take over the middle of the frame for a few seconds: a slanted band wipes in, the letters slam down,
-// rings and sparks burst out. Pure display, driven by `popup`.
-const SPARKS = Array.from({ length: 22 }, (_, i) => {
-  const a = (i / 22) * Math.PI * 2 + ((i * 37) % 7) * 0.08;
-  const d = 16 + ((i * 53) % 13) * 1.6;
-  return { dx: Math.cos(a) * d * 1.5, dy: Math.sin(a) * d * 0.8, s: 0.7 + ((i * 29) % 5) * 0.25, hue: i % 3 };
-});
-const STREAKS = [8, 24, 38, 54, 70, 84];
-
-function BoundaryFx({ popup }) {
-  const six = popup.kind === 'six';
-  const word = six ? 'SIX' : 'FOUR';
-  return (
-    <div className={`gx-fx ${six ? 'six' : 'four'}`}>
-      <div className="gx-fx-ring r1" /><div className="gx-fx-ring r2" />
-      {six && SPARKS.map((sp, i) => (
-        <i key={i} className={`gx-spark h${sp.hue}`} style={{ '--dx': `calc(var(--u) * ${sp.dx.toFixed(1)})`, '--dy': `calc(var(--u) * ${sp.dy.toFixed(1)})`, '--s': sp.s }} />
-      ))}
-      <div className="gx-fx-band">
-        {!six && STREAKS.map((y, i) => <s key={i} style={{ '--y': `${y}%`, '--k': i }} />)}
-        <div className="gx-fx-in">
-          <div className="gx-fx-word" aria-label={word}>{[...word].map((c, i) => <i key={i} style={{ '--k': i }}>{c}</i>)}</div>
-          <div className="gx-fx-info">
-            <em>{six ? 'Maximum' : 'Boundary'}</em>
-            <b>{popup.sub}</b>
-            {popup.detail && <small>{popup.detail}</small>}
-          </div>
-        </div>
-        <span className="gx-fx-shine" />
-      </div>
-    </div>
-  );
-}
-
-// Innings summary (first innings and the break) that turns into the match summary in the second innings.
-function SummarySlot({ on, state }) {
-  const [held, leaving] = useLeave(on ? { id: 'summary' } : null);
-  if (!held) return null;
-  const { kind, innings, status } = summaryCard(state);
-  const match = kind === 'match';
-  const bat = (b, i) => (
-    <div key={`b${i}`} className="gx-sc-row" style={{ '--i': i }}>
-      <span className="gx-sc-name">{b.name}{!b.out && <em>*</em>}</span>
-      <b>{b.runs}<small>({b.balls})</small></b>
-      {!match && <b className="dim">{b.fours}/{b.sixes}</b>}
-      <b className="dim">{fixed(b.sr)}</b>
-    </div>
-  );
-  const bowl = (b, i) => (
-    <div key={`w${i}`} className="gx-sc-row" style={{ '--i': i + 3 }}>
-      <span className="gx-sc-name">{b.name}</span>
-      <b className="wk">{b.wickets}-{b.runs}</b>
-      {!match && <b className="dim">{b.overs}</b>}
-      <b className="dim">{fixed(b.econ, 2)}</b>
-    </div>
-  );
-  const labels = (a, b, c) => <div className="gx-sc-cols"><span>{a}</span>{b.map((x) => <i key={x}>{x}</i>)}{c}</div>;
-  return (
-    <div className={`gx-sc-wrap ${leaving ? 'out' : ''}`}>
-      <div className={`gx-sc ${match ? 'match' : 'innings'}`}>
-        <div className="gx-tm-shine" />
-        <header className="gx-worm-head"><b>{match ? 'Match summary' : 'Innings summary'}</b><small>{match ? innings.map((i) => i.team).join(' v ') : innings[0].team}</small></header>
-        <div className="gx-sc-grid">
-          {innings.map((inn, ii) => (
-            <section key={ii} className="gx-sc-in" style={{ '--t': ii }}>
-              <div className="gx-sc-hero">
-                <span className="gx-sc-team">{inn.team}</span>
-                <b className="gx-sc-score">{inn.runs}<i>/{inn.wickets}</i></b>
-                <small>{inn.overs} overs{inn.rate !== null && ` · RR ${fixed(inn.rate, 2)}`}</small>
-              </div>
-              <div className="gx-sc-lists">
-                <div className="gx-sc-list">
-                  {labels('Batting', match ? ['R (B)', 'SR'] : ['R (B)', '4/6', 'SR'], null)}
-                  {inn.batters.map(bat)}
-                </div>
-                <div className="gx-sc-list">
-                  {labels('Bowling', match ? ['W-R', 'Econ'] : ['W-R', 'Ov', 'Econ'], null)}
-                  {inn.bowlers.map(bowl)}
-                </div>
-              </div>
-              {!match && <div className="gx-sc-extras">Extras {inn.extras}</div>}
-            </section>
-          ))}
-        </div>
-        <footer className="gx-wl-note" key={status}>{status}</footer>
-      </div>
-    </div>
-  );
-}
-
-const POP = { four: 'FOUR', six: 'SIX', wicket: 'WICKET' };
-const HIDE_MS = 1050; // keep in step with the .leaving animations in graphic.css
-
-export default function Scorebug({ state, mode, popup, profile, teams, worm, summary }) {
-  const live = mode !== 'hide';
-  const lastMode = useRef(mode);
-  if (live) lastMode.current = mode;
-  const [mounted, setMounted] = useState(live);
-  const [leaving, setLeaving] = useState(false);
-  useEffect(() => {
-    if (live) { setMounted(true); setLeaving(false); return undefined; }
-    if (!mounted) return undefined;
-    setLeaving(true); // Hide: the details drop out, the bar rolls shut behind a lime edge, then everything is removed
-    const t = setTimeout(() => { setMounted(false); setLeaving(false); }, HIDE_MS);
-    return () => clearTimeout(t);
-  }, [live]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!mounted && !live) return <div className="gx-layer" />;
-  const shownMode = lastMode.current;
-  const tv = shownMode === 'target' ? targetView(state) : null;
-  const solo = shownMode === 'summary';
-  const body = shownMode === 'batters' ? <BattersBody state={state} />
-    : shownMode === 'bowler' ? <BowlerBody state={state} />
-    : shownMode === 'target' ? <TargetBody v={tv} />
-    : shownMode === 'summary' ? <SummaryBody state={state} />
+  const tv = shown === 'target' ? targetView(state) : null;
+  const solo = shown === 'summary';
+  const body = shown === 'batters' ? <BattersBody state={state} />
+    : shown === 'bowler' ? <BowlerBody state={state} />
+    : shown === 'target' ? <TargetBody v={tv} />
+    : shown === 'summary' ? <SummaryBody state={state} />
     : <LiveBody state={state} />;
   return (
-    <div className="gx-layer">
-      {popup && live && popup.kind !== 'wicket' && <BoundaryFx key={popup.id} popup={popup} />}
-      <ProfileSlot profile={live ? profile : null} />
-      <TeamsSlot teams={live ? teams : null} />
-      <WormSlot on={live && !!worm} state={state} />
-      <SummarySlot on={live && !!summary} state={state} />
-      <div className={`gx-stack ${leaving ? 'leaving' : ''}`} key={shownMode}>
-        {popup && live && popup.kind === 'wicket' && (
-          <div className={`gx-pop ${popup.kind}`} key={popup.id}>
-            <b>{POP[popup.kind]}</b>{popup.sub && <small>{popup.sub}</small>}
-          </div>
-        )}
-        <div className="gx-card">
-          <div className={`gx-bar ${solo ? 'solo' : ''}`}>
-            {!solo && <TeamBlock state={state} />}
-            {body}
+    <div className={`gx-layer ${hiding ? 'hiding' : ''}`}>
+      {fxShown && <div className={`gx-fx-wrap ${fxLeaving ? 'leaving' : ''}`} key={fxShown.id}><Fx fx={fxShown} /></div>}
+      {shown && alr && <div className={`gx-alert-wrap ${alrLeaving ? 'leaving' : ''}`} key={alr.id}><AlertCard a={alr} /></div>}
+      {shown && pan && <div className={`gx-panel-wrap ${pan.kind === 'motm' ? 'center' : ''} ${panLeaving ? 'leaving' : ''}`} key={pan.id}><Panel data={pan} /></div>}
+      {shown && prof && <div className={`gx-prof-wrap ${profLeaving ? 'leaving' : ''}`} key={prof.id}><PlayerProfile profile={prof} /></div>}
+      {shown && (
+        <div className="gx-stack" key={shown}>
+          {popup && (
+            <div className={`gx-pop ${popup.kind}`} key={popup.id}>
+              <b>{POP[popup.kind]}</b>{popup.sub && <small>{popup.sub}</small>}
+            </div>
+          )}
+          <div className="gx-card">
+            <div className={`gx-bar ${solo ? 'solo' : ''}`}>
+              {!solo && <TeamBlock state={state} />}
+              {body}
+            </div>
           </div>
         </div>
-        {leaving && <div className="gx-roll-edge" />}
-      </div>
+      )}
     </div>
   );
 }

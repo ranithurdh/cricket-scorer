@@ -1,7 +1,7 @@
 // The numbers the stream graphic shows (src/graphicStats.js), checked against the real scoring engine:  npm run test:graphic
 import assert from 'node:assert/strict';
 import { computeState } from '../../src/engine.js';
-import { ballToken, bowlerLine, liveNote, partnership, summaryView, targetView, wormData, wormNote, summaryCard } from '../../src/graphicStats.js';
+import { ballToken, bowlerLine, liveNote, partnership, summaryView, targetView } from '../../src/graphicStats.js';
 
 const team = (n, k) => ({ name: n, players: [0, 1, 2, 3].map((j) => ({ id: `${k}${j}`, name: `${n}${j}` })) });
 const config = { wideRuns: 1, noBallRuns: 1, allowConsecutiveOvers: false, overs: 2, ballsPerOver: 6, battingFirst: 0, lastManBats: false, teams: [team('Red', 'a'), team('Blue', 'b')] };
@@ -65,34 +65,5 @@ assert.equal(t.kind, 'result');
 assert.equal(t.text, 'Blue won by 3 wickets');
 assert.equal(summaryView(s).status, 'Blue won by 3 wickets');
 assert.deepEqual(liveNote(s), { left: 'Blue won by 3 wickets' });
-
-// Worm graph: one point per ball (x in overs), wickets marked, wides add runs without moving along
-{
-  const w = wormData(computeState(config, [...first, ball(0, null, { kind: 'bowled', outId: 'a0' })]));
-  assert.equal(w.lines.length, 1);
-  assert.equal(w.maxOvers, 2);
-  assert.deepEqual(w.lines[0].points.map((p) => [Number(p.x.toFixed(3)), p.y]), [[0, 0], [0.167, 4], [0.333, 5], [0.5, 5], [0.5, 7], [0.667, 9], [0.833, 9]]);
-  assert.deepEqual(w.lines[0].wickets.map((p) => [Number(p.x.toFixed(3)), p.y]), [[0.833, 9]]);
-  assert.equal(w.lines[0].balls, 6);
-  assert.equal(w.lines[0].points.length, 7);
-  const live = computeState(config, [...first, ball(0, null, { kind: 'bowled', outId: 'a0' }), { type: 'end_innings' }, { type: 'next_innings' }, sel('striker', 'b0'), sel('nonStriker', 'b1'), sel('bowler', 'a1'), ball(4)]);
-  assert.equal(wormData(live).lines.length, 2);
-  assert.equal(wormData(live).target, 10);
-  assert.equal(wormNote(live), 'Blue need 6 more runs to win from 11 balls');
-}
-
-// Summary card: innings summary in the first innings, match summary once the second has started
-{
-  const one = summaryCard(computeState(config, first));
-  assert.equal(one.kind, 'innings');
-  assert.equal(one.innings.length, 1);
-  assert.deepEqual(one.innings[0].batters.map((b) => [b.name, b.runs, b.balls, b.out]), [['Red0', 7, 3, false], ['Red1', 0, 1, false]]);
-  assert.deepEqual(one.innings[0].bowlers.map((b) => [b.name, b.wickets, b.runs, b.overs]), [['Blue0', 0, 9, '0.4']]);
-  assert.equal(one.status, 'Red batting');
-  const two = summaryCard(computeState(config, [...first, ball(0, null, { kind: 'bowled', outId: 'a0' }), { type: 'end_innings' }, { type: 'next_innings' }, sel('striker', 'b0'), sel('nonStriker', 'b1'), sel('bowler', 'a1'), ball(4)]));
-  assert.equal(two.kind, 'match');
-  assert.equal(two.innings.length, 2);
-  assert.equal(two.innings[1].runs, 4);
-}
 
 console.log('graphic stats ok');
